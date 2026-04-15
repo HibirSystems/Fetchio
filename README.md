@@ -139,6 +139,48 @@ yt-dlp supports **1000+** platforms out of the box, including:
 
 ---
 
+## Releasing a Production APK
+
+The CI workflow in `.github/workflows/release-apk.yml` automatically builds and publishes a signed APK to GitHub Releases whenever you push a version tag.
+
+### One-time setup (GitHub repository secrets)
+
+Go to **Settings → Secrets and variables → Actions** and add:
+
+| Secret | Description |
+|--------|-------------|
+| `KEYSTORE_BASE64` | Base64-encoded `.jks` keystore (`base64 -w0 release.jks`) |
+| `KEY_ALIAS` | Signing key alias |
+| `KEY_PASSWORD` | Password for the signing key |
+| `STORE_PASSWORD` | Keystore password |
+| `PRODUCTION_API_URL` | Production API base URL, e.g. `https://api.example.com/api/v1` |
+
+#### Generating a keystore (first time only)
+
+```bash
+keytool -genkeypair -v \
+  -keystore release.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -alias fetchio
+# then encode it:
+base64 -w0 release.jks
+```
+
+Paste the output into the `KEYSTORE_BASE64` secret.
+
+### Trigger a release
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow will build a release APK signed with your keystore, then publish it as a GitHub Release with the APK attached.
+
+You can also trigger it manually from **Actions → Build & Release APK → Run workflow**.
+
+---
+
 ## License
 
 MIT

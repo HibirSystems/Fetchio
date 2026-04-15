@@ -14,6 +14,10 @@ frontend/.flutter-plugins
 frontend/.flutter-plugins-dependencies
 frontend/.packages
 frontend/pubspec.lock
+frontend/android/key.properties
+frontend/android/app/*.jks
+frontend/android/app/*.keystore
+frontend/android/local.properties
 
 .DS_Store
 *.swp
