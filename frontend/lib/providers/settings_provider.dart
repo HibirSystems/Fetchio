@@ -7,14 +7,14 @@ import '../core/constants/app_constants.dart';
 
 class AppSettings {
   AppSettings({
-    this.apiBaseUrl = 'http://10.0.2.2:8000/api/v1',
+    String? apiBaseUrl,
     this.themeMode = 'dark',
     this.maxConcurrentDownloads = 3,
     this.defaultDownloadFormat = 'best_video',
     this.audioOnly = false,
     this.embedThumbnail = true,
     this.preferredQuality = '1080',
-  });
+  }) : apiBaseUrl = apiBaseUrl ?? AppConstants.baseUrl;
 
   String apiBaseUrl;
   String themeMode;
