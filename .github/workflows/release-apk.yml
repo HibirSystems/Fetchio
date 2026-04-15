@@ -49,10 +49,12 @@ jobs:
         run: flutter pub get
 
       - name: Decode keystore
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         working-directory: frontend/android/app
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > release.jks
 
       - name: Create key.properties
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         working-directory: frontend/android
         run: |
           cat > key.properties << 'EOF'
@@ -68,16 +70,31 @@ jobs:
           VERSION="${{ steps.version.outputs.tag }}"
           # Strip leading 'v' for --build-name (e.g. v1.2.3 -> 1.2.3)
           BUILD_NAME="${VERSION#v}"
-          flutter build apk --release \
-            --dart-define=API_BASE_URL=${{ secrets.PRODUCTION_API_URL }} \
-            --build-name="$BUILD_NAME" \
-            --build-number="${{ github.run_number }}"
+          # Default to the production domain when the secret is not configured
+          API_URL="${{ secrets.PRODUCTION_API_URL }}"
+          API_URL="${API_URL:-https://samuelmedia.tech/api/v1}"
+          if [ -f "android/key.properties" ]; then
+            flutter build apk --release \
+              --dart-define=API_BASE_URL="${API_URL}" \
+              --build-name="$BUILD_NAME" \
+              --build-number="${{ github.run_number }}"
+          else
+            flutter build apk --debug \
+              --dart-define=API_BASE_URL="${API_URL}" \
+              --build-name="$BUILD_NAME" \
+              --build-number="${{ github.run_number }}"
+          fi
 
       - name: Rename APK
         run: |
           VERSION="${{ steps.version.outputs.tag }}"
-          mv frontend/build/app/outputs/flutter-apk/app-release.apk \
-             frontend/build/app/outputs/flutter-apk/fetchio-${VERSION}.apk
+          if [ -f "frontend/build/app/outputs/flutter-apk/app-release.apk" ]; then
+            mv frontend/build/app/outputs/flutter-apk/app-release.apk \
+               frontend/build/app/outputs/flutter-apk/fetchio-${VERSION}.apk
+          else
+            mv frontend/build/app/outputs/flutter-apk/app-debug.apk \
+               frontend/build/app/outputs/flutter-apk/fetchio-${VERSION}.apk
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
