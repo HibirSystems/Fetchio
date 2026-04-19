@@ -88,7 +88,8 @@ class BinaryManager {
     final file = File('$nativeLibDir/$filename');
     if (!file.existsSync()) {
       throw FileSystemException(
-        'Bundled binary "$filename" not found in native library directory',
+        'Bundled binary "$filename" not found in native library directory. '
+        'Run frontend/scripts/download_binaries.sh before building the APK.',
         file.path,
       );
     }
