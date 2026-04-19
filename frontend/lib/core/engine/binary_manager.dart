@@ -87,7 +87,7 @@ class BinaryManager {
     final file = File('$nativeLibDir/$filename');
     if (!file.existsSync()) {
       throw FileSystemException(
-        'Bundled binary not found in native library directory',
+        'Bundled binary "$filename" not found in native library directory',
         file.path,
       );
     }
@@ -100,7 +100,8 @@ class BinaryManager {
       return await _resolveBundledAndroidBinary(filename);
     } catch (e) {
       stderr.writeln(
-        'Optional Android binary "$filename" is unavailable: $e',
+        'Optional Android binary "$filename" is unavailable. '
+        'Some conversions/merging features may be limited: $e',
       );
       return null;
     }
