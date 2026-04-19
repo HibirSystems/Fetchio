@@ -117,7 +117,7 @@ jobs:
             ### Notes
             - The APK includes yt-dlp and ffmpeg binaries for arm64-v8a, armeabi-v7a, and x86_64.
             - A universal APK (all ABIs) and per-ABI APKs are attached below.
-            - First launch extracts the binaries automatically — expect a brief delay.
+            - Binaries are bundled in Android native library directories for direct on-device execution.
           files: frontend/build/app/outputs/flutter-apk/fetchio-*.apk
           draft: false
           prerelease: false

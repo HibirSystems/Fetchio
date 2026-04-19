@@ -51,8 +51,7 @@ android {
 
     defaultConfig {
         applicationId "com.hibir.fetchio"
-        // Raised to 24 to guarantee a compatible Linux kernel ABI for the
-        // bundled yt-dlp and ffmpeg static binaries (Android 7.0+).
+        // Raised to 24 to guarantee compatibility with the bundled binaries.
         minSdkVersion 24
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
@@ -88,6 +87,11 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+
+    packagingOptions {
+        doNotStrip "lib/*/libfetchio_ytdlp.so"
+        doNotStrip "lib/*/libfetchio_ffmpeg.so"
     }
 }
 

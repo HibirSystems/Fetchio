@@ -5,6 +5,10 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    companion object {
+        private const val RUNTIME_CHANNEL = "com.hibir.fetchio/runtime"
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val bridge = MediaStoreBridge(this)
@@ -12,5 +16,15 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             MediaStoreBridge.CHANNEL,
         ).setMethodCallHandler(bridge)
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            RUNTIME_CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getNativeLibraryDir" -> result.success(applicationInfo.nativeLibraryDir)
+                else -> result.notImplemented()
+            }
+        }
     }
 }

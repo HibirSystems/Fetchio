@@ -1,18 +1,21 @@
 import 'dart:ffi' show Abi;
 import 'dart:io';
 
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/services.dart' show MethodChannel, rootBundle;
 import 'package:path_provider/path_provider.dart';
 
 /// Manages extraction and lifecycle of the bundled yt-dlp and ffmpeg binaries.
 ///
-/// Binaries are shipped as Flutter assets under `assets/binaries/{abi}/`.
-/// On first run they are copied into the app's private files directory,
-/// made executable, and their paths are cached for the session.
+/// On Android, binaries are bundled under `android/app/src/main/jniLibs/{abi}/`
+/// and resolved from `nativeLibraryDir` (read-only executable location).
+/// On non-Android platforms, binaries fall back to Flutter assets.
 class BinaryManager {
   BinaryManager._();
 
   static final BinaryManager instance = BinaryManager._();
+  static const MethodChannel _runtimeChannel =
+      MethodChannel('com.hibir.fetchio/runtime');
 
   String? _ytDlpPath;
   String? _ffmpegPath;
@@ -30,7 +33,7 @@ class BinaryManager {
 
   bool get isReady => _ready;
 
-  /// Extracts binaries from assets if they are missing or outdated.
+  /// Resolves bundled binaries and caches their absolute paths.
   ///
   /// Safe to call multiple times; subsequent calls are no-ops.
   Future<void> ensureReady() async {
@@ -42,6 +45,13 @@ class BinaryManager {
         'Unsupported CPU architecture: ${Abi.current()}. '
         'Only arm64-v8a, armeabi-v7a, and x86_64 Android ABIs are supported.',
       );
+    }
+
+    if (Platform.isAndroid) {
+      _ytDlpPath = await _resolveBundledAndroidBinary('libfetchio_ytdlp.so');
+      _ffmpegPath = await _tryResolveBundledAndroidBinary('libfetchio_ffmpeg.so');
+      _ready = true;
+      return;
     }
 
     final dir = await getApplicationSupportDirectory();
@@ -68,6 +78,43 @@ class BinaryManager {
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
+  Future<String> _resolveBundledAndroidBinary(String filename) async {
+    final nativeLibDir =
+        await _runtimeChannel.invokeMethod<String>('getNativeLibraryDir');
+    if (nativeLibDir == null || nativeLibDir.isEmpty) {
+      throw StateError('Failed to resolve Android native library directory.');
+    }
+
+    final file = File('$nativeLibDir/$filename');
+    if (!await file.exists()) {
+      throw FileSystemException(
+        'Bundled binary "$filename" not found in native library directory. '
+        'Run frontend/scripts/download_binaries.sh before building the APK.',
+        file.path,
+      );
+    }
+
+    return file.path;
+  }
+
+  Future<String?> _tryResolveBundledAndroidBinary(String filename) async {
+    try {
+      return await _resolveBundledAndroidBinary(filename);
+    } on FileSystemException catch (e) {
+      debugPrint(
+        'Optional Android binary "$filename" is unavailable. '
+        'Audio extraction and best-stream merge features may be limited: '
+        '${e.message} (${e.path ?? 'no-path'})',
+      );
+      return null;
+    } catch (e) {
+      debugPrint(
+        'Optional Android binary "$filename" resolution failed: $e',
+      );
+      return null;
+    }
+  }
+
   /// Maps the current [Abi] to an Android ABI directory name.
   String? _currentAbi() {
     switch (Abi.current()) {
@@ -86,7 +133,7 @@ class BinaryManager {
   }
 
   /// Copies [assetPath] from the Flutter bundle to [destFile] and makes it
-  /// executable.  Skips the copy if the file already exists and is non-empty.
+  /// executable. Skips the copy if the file already exists and is non-empty.
   Future<String> _extractAsset({
     required String assetPath,
     required File destFile,

@@ -59,7 +59,3 @@ flutter:
     - assets/images/
     - assets/animations/
     - assets/icons/
-    # yt-dlp + ffmpeg binaries (downloaded by scripts/download_binaries.sh before build)
-    - assets/binaries/arm64-v8a/
-    - assets/binaries/armeabi-v7a/
-    - assets/binaries/x86_64/

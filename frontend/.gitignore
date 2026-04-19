@@ -7,9 +7,9 @@ build/
 
 # Binaries downloaded at build time — do NOT commit these.
 # Run scripts/download_binaries.sh to populate them locally.
-assets/binaries/arm64-v8a/yt-dlp
-assets/binaries/arm64-v8a/ffmpeg
-assets/binaries/armeabi-v7a/yt-dlp
-assets/binaries/armeabi-v7a/ffmpeg
-assets/binaries/x86_64/yt-dlp
-assets/binaries/x86_64/ffmpeg
+android/app/src/main/jniLibs/arm64-v8a/libfetchio_ytdlp.so
+android/app/src/main/jniLibs/arm64-v8a/libfetchio_ffmpeg.so
+android/app/src/main/jniLibs/armeabi-v7a/libfetchio_ytdlp.so
+android/app/src/main/jniLibs/armeabi-v7a/libfetchio_ffmpeg.so
+android/app/src/main/jniLibs/x86_64/libfetchio_ytdlp.so
+android/app/src/main/jniLibs/x86_64/libfetchio_ffmpeg.so
