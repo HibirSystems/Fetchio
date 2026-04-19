@@ -161,7 +161,7 @@ class _DownloadOptionsModalState extends State<DownloadOptionsModal> {
               Switch(
                 value: _embedThumbnail,
                 onChanged: (v) => setState(() => _embedThumbnail = v),
-                activeThumbColor: AppColors.primary,
+                activeColor: AppColors.primary,
               ),
             ],
           ),
