@@ -51,7 +51,8 @@ android {
 
     defaultConfig {
         applicationId "com.hibir.fetchio"
-        // yt-dlp standalone binaries require at least Android 7.0 (API 24).
+        // Raised to 24 to guarantee a compatible Linux kernel ABI for the
+        // bundled yt-dlp and ffmpeg static binaries (Android 7.0+).
         minSdkVersion 24
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()

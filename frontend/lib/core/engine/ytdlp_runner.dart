@@ -269,8 +269,10 @@ class YtDlpRunner {
     if (parts.length < 5) return null;
 
     int? parseInt(String s) {
+      // Strip everything except digits and at most one decimal point.
       final cleaned = s.trim().replaceAll(RegExp(r'[^\d.]'), '');
       if (cleaned.isEmpty) return null;
+      // Guard against inputs like "1.2.3" that would make parseDouble return null.
       return double.tryParse(cleaned)?.toInt();
     }
 

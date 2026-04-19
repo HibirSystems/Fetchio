@@ -13,7 +13,7 @@
     <!-- Media access on API 33+ -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <!-- Allow inserting media items into the public collections (API 33+) -->
+    <!-- Read media on API 33+ (READ_MEDIA_IMAGES allows access to image files) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <application

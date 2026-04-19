@@ -273,8 +273,15 @@ class LocalDownloadManager {
         await file.delete();
       } catch (_) {}
       return result;
-    } on PlatformException {
-      // MediaStore not available — return the local path as-is.
+    } on PlatformException catch (e) {
+      // MediaStore insert failed (e.g. permissions not yet granted or running
+      // on a non-Android platform).  The file remains in private app storage.
+      // Debug builds will surface this via Flutter's error handler.
+      assert(() {
+        // ignore: avoid_print
+        print('[Fetchio] MediaStore saveToDownloads failed: $e');
+        return true;
+      }());
       return filePath;
     }
   }

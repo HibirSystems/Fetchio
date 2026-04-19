@@ -17,11 +17,17 @@ ASSETS_DIR="$SCRIPT_DIR/../assets/binaries"
 
 # ── yt-dlp ────────────────────────────────────────────────────────────────────
 
-YTDLP_VERSION="${YTDLP_VERSION:-$(curl -s https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest | grep '"tag_name"' | cut -d'"' -f4)}"
+if [ -z "${YTDLP_VERSION:-}" ]; then
+  YTDLP_VERSION="$(curl -sf https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest | grep '"tag_name"' | cut -d'"' -f4)"
+  if [ -z "$YTDLP_VERSION" ]; then
+    echo "ERROR: Failed to detect the latest yt-dlp version from GitHub API." >&2
+    echo "       Set YTDLP_VERSION manually, e.g.: YTDLP_VERSION=2024.07.25 $0" >&2
+    exit 1
+  fi
+fi
 YTDLP_BASE="https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}"
 
 echo "==> Downloading yt-dlp ${YTDLP_VERSION}"
-
 download_ytdlp() {
   local abi="$1"
   local upstream_name="$2"
