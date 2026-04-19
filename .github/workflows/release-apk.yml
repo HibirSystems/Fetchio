@@ -48,6 +48,10 @@ jobs:
         working-directory: frontend
         run: flutter pub get
 
+      - name: Download yt-dlp + ffmpeg binaries
+        working-directory: frontend
+        run: bash scripts/download_binaries.sh
+
       - name: Decode keystore
         if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         working-directory: frontend/android/app
@@ -68,19 +72,13 @@ jobs:
         working-directory: frontend
         run: |
           VERSION="${{ steps.version.outputs.tag }}"
-          # Strip leading 'v' for --build-name (e.g. v1.2.3 -> 1.2.3)
           BUILD_NAME="${VERSION#v}"
-          # Default to the production domain when the secret is not configured
-          API_URL="${{ secrets.PRODUCTION_API_URL }}"
-          API_URL="${API_URL:-https://samuelmedia.tech/api/v1}"
           if [ -f "android/key.properties" ]; then
             flutter build apk --release \
-              --dart-define=API_BASE_URL="${API_URL}" \
               --build-name="$BUILD_NAME" \
               --build-number="${{ github.run_number }}"
           else
             flutter build apk --debug \
-              --dart-define=API_BASE_URL="${API_URL}" \
               --build-name="$BUILD_NAME" \
               --build-number="${{ github.run_number }}"
           fi
@@ -104,19 +102,20 @@ jobs:
           body: |
             ## Fetchio ${{ steps.version.outputs.tag }}
 
+            ### What's new
+            - **Fully standalone** — yt-dlp and ffmpeg run **on-device**, no backend server required.
+            - Downloads are saved to the device Downloads / Gallery automatically.
+            - Supports Android 7.0 (API 24) and above.
+
             ### Installation
             1. Download `fetchio-*.apk` below
             2. On your Android device, enable **Install unknown apps** for your browser or file manager
             3. Open the downloaded APK and tap **Install**
 
-            ### What's in this release
-            - Production build targeting the configured API server
-            - ProGuard-optimised and resource-shrunk APK
-            - Supports Android 5.0 (API 21) and above
-
-            ### Configuration
-            The app connects to the production API automatically.
-            You can override the API URL anytime in **Settings → API Configuration → API Base URL**.
+            ### Notes
+            - The APK includes yt-dlp and ffmpeg binaries for arm64-v8a, armeabi-v7a, and x86_64.
+            - A universal APK (all ABIs) and per-ABI APKs are attached below.
+            - First launch extracts the binaries automatically — expect a brief delay.
           files: frontend/build/app/outputs/flutter-apk/fetchio-*.apk
           draft: false
           prerelease: false

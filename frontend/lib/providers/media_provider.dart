@@ -1,24 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
 
-import '../core/network/dio_client.dart';
+import '../core/engine/local_media_repository.dart';
 import '../shared/models/media_info.dart';
 
-class MediaRepository {
-  const MediaRepository(this._dio);
-  final Dio _dio;
-
-  Future<MediaInfo> getInfo(String url) async {
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/media/info',
-      queryParameters: {'url': url},
-    );
-    return MediaInfo.fromJson(response.data!);
-  }
-}
-
-final mediaRepositoryProvider = Provider<MediaRepository>((ref) {
-  return MediaRepository(ref.watch(dioProvider));
+final mediaRepositoryProvider = Provider<LocalMediaRepository>((ref) {
+  return const LocalMediaRepository();
 });
 
 final mediaInfoProvider =

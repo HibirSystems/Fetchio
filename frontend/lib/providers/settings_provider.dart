@@ -7,16 +7,14 @@ import '../core/constants/app_constants.dart';
 
 class AppSettings {
   AppSettings({
-    String? apiBaseUrl,
     this.themeMode = 'dark',
     this.maxConcurrentDownloads = 3,
     this.defaultDownloadFormat = 'best_video',
     this.audioOnly = false,
     this.embedThumbnail = true,
     this.preferredQuality = '1080',
-  }) : apiBaseUrl = apiBaseUrl ?? AppConstants.baseUrl;
+  });
 
-  String apiBaseUrl;
   String themeMode;
   int maxConcurrentDownloads;
   String defaultDownloadFormat;
@@ -25,7 +23,6 @@ class AppSettings {
   String preferredQuality;
 
   AppSettings copyWith({
-    String? apiBaseUrl,
     String? themeMode,
     int? maxConcurrentDownloads,
     String? defaultDownloadFormat,
@@ -34,10 +31,11 @@ class AppSettings {
     String? preferredQuality,
   }) {
     return AppSettings(
-      apiBaseUrl: apiBaseUrl ?? this.apiBaseUrl,
       themeMode: themeMode ?? this.themeMode,
-      maxConcurrentDownloads: maxConcurrentDownloads ?? this.maxConcurrentDownloads,
-      defaultDownloadFormat: defaultDownloadFormat ?? this.defaultDownloadFormat,
+      maxConcurrentDownloads:
+          maxConcurrentDownloads ?? this.maxConcurrentDownloads,
+      defaultDownloadFormat:
+          defaultDownloadFormat ?? this.defaultDownloadFormat,
       audioOnly: audioOnly ?? this.audioOnly,
       embedThumbnail: embedThumbnail ?? this.embedThumbnail,
       preferredQuality: preferredQuality ?? this.preferredQuality,
@@ -56,7 +54,11 @@ class SearchHistoryNotifier extends StateNotifier<List<String>> {
 
   Future<void> _load() async {
     _box = await Hive.openBox<String>(AppConstants.searchHistoryBox);
-    state = _box.values.toList().reversed.take(AppConstants.maxSearchHistoryItems).toList();
+    state = _box.values
+        .toList()
+        .reversed
+        .take(AppConstants.maxSearchHistoryItems)
+        .toList();
   }
 
   Future<void> add(String query) async {
@@ -103,13 +105,18 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> _load() async {
     _box = await Hive.openBox<dynamic>(AppConstants.settingsBox);
     state = AppSettings(
-      apiBaseUrl: _box.get('apiBaseUrl', defaultValue: state.apiBaseUrl) as String,
       themeMode: _box.get('themeMode', defaultValue: state.themeMode) as String,
-      maxConcurrentDownloads: _box.get('maxConcurrentDownloads', defaultValue: state.maxConcurrentDownloads) as int,
-      defaultDownloadFormat: _box.get('defaultDownloadFormat', defaultValue: state.defaultDownloadFormat) as String,
-      audioOnly: _box.get('audioOnly', defaultValue: state.audioOnly) as bool,
-      embedThumbnail: _box.get('embedThumbnail', defaultValue: state.embedThumbnail) as bool,
-      preferredQuality: _box.get('preferredQuality', defaultValue: state.preferredQuality) as String,
+      maxConcurrentDownloads: _box.get('maxConcurrentDownloads',
+          defaultValue: state.maxConcurrentDownloads) as int,
+      defaultDownloadFormat: _box.get('defaultDownloadFormat',
+          defaultValue: state.defaultDownloadFormat) as String,
+      audioOnly:
+          _box.get('audioOnly', defaultValue: state.audioOnly) as bool,
+      embedThumbnail:
+          _box.get('embedThumbnail', defaultValue: state.embedThumbnail)
+              as bool,
+      preferredQuality: _box.get('preferredQuality',
+          defaultValue: state.preferredQuality) as String,
     );
   }
 
@@ -131,11 +138,6 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> setPreferredQuality(String quality) async {
     state = state.copyWith(preferredQuality: quality);
     await _box.put('preferredQuality', quality);
-  }
-
-  Future<void> setApiBaseUrl(String url) async {
-    state = state.copyWith(apiBaseUrl: url);
-    await _box.put('apiBaseUrl', url);
   }
 }
 

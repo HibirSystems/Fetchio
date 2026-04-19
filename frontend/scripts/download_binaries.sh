@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Downloads yt-dlp and ffmpeg standalone binaries for all supported Android ABIs.
+#
+# Run this before `flutter build apk` when building locally:
+#   cd frontend && bash scripts/download_binaries.sh
+#
+# The CI workflow (release-apk.yml) calls this automatically.
+#
+# Binary sources:
+#   yt-dlp  – https://github.com/yt-dlp/yt-dlp/releases/latest
+#   ffmpeg  – https://johnvansickle.com/ffmpeg/ (static Linux ARM builds)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ASSETS_DIR="$SCRIPT_DIR/../assets/binaries"
+
+# ── yt-dlp ────────────────────────────────────────────────────────────────────
+
+YTDLP_VERSION="${YTDLP_VERSION:-$(curl -s https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest | grep '"tag_name"' | cut -d'"' -f4)}"
+YTDLP_BASE="https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}"
+
+echo "==> Downloading yt-dlp ${YTDLP_VERSION}"
+
+download_ytdlp() {
+  local abi="$1"
+  local upstream_name="$2"
+  local dest="${ASSETS_DIR}/${abi}/yt-dlp"
+  mkdir -p "${ASSETS_DIR}/${abi}"
+  echo "    [yt-dlp] ${abi} <- ${upstream_name}"
+  curl -L --retry 3 -o "${dest}" "${YTDLP_BASE}/${upstream_name}"
+  chmod 755 "${dest}"
+}
+
+download_ytdlp "arm64-v8a"   "yt-dlp_linux_aarch64"
+download_ytdlp "armeabi-v7a" "yt-dlp_linux_armv7l"
+download_ytdlp "x86_64"      "yt-dlp_linux_x86_64"
+
+# ── ffmpeg ────────────────────────────────────────────────────────────────────
+# John Van Sickle's static ARM builds are widely used for Android/Termux.
+# We pull the "arm64" and "armhf" variants, which map to arm64-v8a and armeabi-v7a.
+# For x86_64 we use the amd64 static build.
+
+FFMPEG_BASE="https://johnvansickle.com/ffmpeg/releases"
+
+echo "==> Downloading ffmpeg (static)"
+
+download_ffmpeg() {
+  local abi="$1"
+  local archive_name="$2"
+  local inner_binary="$3"   # path inside the tar.xz
+  local dest="${ASSETS_DIR}/${abi}/ffmpeg"
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+
+  echo "    [ffmpeg] ${abi} <- ${archive_name}"
+  curl -L --retry 3 -o "${tmp_dir}/ffmpeg.tar.xz" "${FFMPEG_BASE}/${archive_name}"
+  tar -xJf "${tmp_dir}/ffmpeg.tar.xz" -C "${tmp_dir}" --strip-components=1 --wildcards "*/${inner_binary}"
+  mv "${tmp_dir}/${inner_binary}" "${dest}"
+  chmod 755 "${dest}"
+  rm -rf "${tmp_dir}"
+}
+
+download_ffmpeg "arm64-v8a"   "ffmpeg-release-arm64-static.tar.xz" "ffmpeg"
+download_ffmpeg "armeabi-v7a" "ffmpeg-release-armhf-static.tar.xz" "ffmpeg"
+download_ffmpeg "x86_64"      "ffmpeg-release-amd64-static.tar.xz" "ffmpeg"
+
+echo ""
+echo "==> Done.  Binaries written to assets/binaries/"
+ls -lh "${ASSETS_DIR}/arm64-v8a/"
