@@ -104,13 +104,12 @@ class BinaryManager {
       debugPrint(
         'Optional Android binary "$filename" is unavailable. '
         'Audio extraction and best-stream merge features may be limited: '
-        '[${e.runtimeType}] $e',
+        '${e.message} (${e.path ?? 'no-path'})',
       );
       return null;
     } catch (e) {
       debugPrint(
-        'Optional Android binary "$filename" resolution failed: '
-        '[${e.runtimeType}] $e',
+        'Optional Android binary "$filename" resolution failed: $e',
       );
       return null;
     }
