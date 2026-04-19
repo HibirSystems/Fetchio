@@ -86,7 +86,8 @@ class _DownloadOptionsModalState extends State<DownloadOptionsModal> {
           const SizedBox(height: 4),
           Text(
             widget.mediaInfo.title,
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style:
+                const TextStyle(color: AppColors.textSecondary, fontSize: 13),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -95,14 +96,16 @@ class _DownloadOptionsModalState extends State<DownloadOptionsModal> {
           // Mode toggle
           Row(
             children: [
-              Expanded(child: _ModeChip(
+              Expanded(
+                  child: _ModeChip(
                 label: 'Video',
                 icon: Icons.videocam_outlined,
                 selected: _mode == 'video',
                 onTap: () => setState(() => _mode = 'video'),
               )),
               const SizedBox(width: 8),
-              Expanded(child: _ModeChip(
+              Expanded(
+                  child: _ModeChip(
                 label: 'Audio Only',
                 icon: Icons.audiotrack_outlined,
                 selected: _mode == 'audio',
@@ -156,7 +159,8 @@ class _DownloadOptionsModalState extends State<DownloadOptionsModal> {
                   size: 16, color: AppColors.textHint),
               const SizedBox(width: 6),
               const Text('Embed thumbnail',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  style:
+                      TextStyle(color: AppColors.textSecondary, fontSize: 13)),
               const Spacer(),
               Switch(
                 value: _embedThumbnail,
@@ -207,7 +211,9 @@ class _ModeChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withOpacity(0.15) : AppColors.darkCard,
+          color: selected
+              ? AppColors.primary.withOpacity(0.15)
+              : AppColors.darkCard,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.darkDivider,

@@ -59,13 +59,13 @@ android {
     }
 
     // Build per-ABI APKs so each variant only bundles the relevant binary,
-    // keeping the download size manageable.
+    // keeping the download size small.
     splits {
         abi {
             enable true
             reset()
             include 'arm64-v8a', 'armeabi-v7a', 'x86_64'
-            universalApk true // also produce a fat APK for convenience
+            universalApk false
         }
     }
 
@@ -87,11 +87,6 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
-    }
-
-    packagingOptions {
-        doNotStrip "lib/*/libfetchio_ytdlp.so"
-        doNotStrip "lib/*/libfetchio_ffmpeg.so"
     }
 }
 

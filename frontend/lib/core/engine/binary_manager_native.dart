@@ -1,21 +1,16 @@
 import 'dart:ffi' show Abi;
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show debugPrint;
-import 'package:flutter/services.dart' show MethodChannel, rootBundle;
 import 'package:path_provider/path_provider.dart';
 
-/// Manages extraction and lifecycle of the bundled yt-dlp and ffmpeg binaries.
-///
-/// On Android, binaries are bundled under `android/app/src/main/jniLibs/{abi}/`
-/// and resolved from `nativeLibraryDir` (read-only executable location).
-/// On non-Android platforms, binaries fall back to Flutter assets.
+/// Manages lifecycle of yt-dlp binaries downloaded after app installation.
 class BinaryManager {
   BinaryManager._();
 
   static final BinaryManager instance = BinaryManager._();
-  static const MethodChannel _runtimeChannel =
-      MethodChannel('com.hibir.fetchio/runtime');
+
+  static const String _engineMissingMessage =
+      'yt-dlp engine is not installed. Open Settings > Engine and tap "Download Engine".';
 
   String? _ytDlpPath;
   String? _ffmpegPath;
@@ -38,7 +33,14 @@ class BinaryManager {
   /// Safe to call multiple times; subsequent calls are no-ops.
   Future<void> ensureReady() async {
     if (_ready) return;
+    final isInstalled = await refreshStatus();
+    if (!isInstalled) {
+      throw StateError(_engineMissingMessage);
+    }
+  }
 
+  /// Installs or updates yt-dlp for the current ABI.
+  Future<void> installOrUpdateYtDlp() async {
     final abi = _currentAbi();
     if (abi == null) {
       throw UnsupportedError(
@@ -47,68 +49,91 @@ class BinaryManager {
       );
     }
 
-    if (Platform.isAndroid) {
-      try {
-        _ytDlpPath =
-            await _resolveBundledAndroidBinary('libfetchio_ytdlp.so');
-        _ffmpegPath =
-            await _tryResolveBundledAndroidBinary('libfetchio_ffmpeg.so');
-        _ready = true;
-        return;
-      } on FileSystemException catch (e) {
-        debugPrint(
-          'Bundled Android binaries are missing; falling back to asset extraction: '
-          '${e.message} (${e.path ?? 'no-path'})',
+    final dir = await getApplicationSupportDirectory();
+    final binDir = Directory('${dir.path}/binaries/$abi');
+    await binDir.create(recursive: true);
+
+    final file = File('${binDir.path}/yt-dlp');
+    final url = _ytDlpDownloadUrl(abi);
+
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(Uri.parse(url));
+      request.followRedirects = true;
+      final response = await request.close();
+      if (response.statusCode != HttpStatus.ok) {
+        throw HttpException(
+          'Failed to download yt-dlp (HTTP ${response.statusCode})',
+          uri: Uri.parse(url),
         );
-        await _prepareFromAssets(abi);
-        _ready = true;
-        return;
       }
+
+      final sink = file.openWrite();
+      await response.pipe(sink);
+      await sink.flush();
+      await sink.close();
+
+      final chmod = await Process.run('chmod', ['755', file.path]);
+      if (chmod.exitCode != 0) {
+        throw ProcessException(
+          'chmod',
+          ['755', file.path],
+          chmod.stderr.toString(),
+          chmod.exitCode,
+        );
+      }
+
+      _ytDlpPath = file.path;
+      _ffmpegPath = null;
+      _ready = true;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// Deletes installed yt-dlp binary.
+  Future<void> removeYtDlp() async {
+    final abi = _currentAbi();
+    if (abi == null) {
+      _ready = false;
+      _ytDlpPath = null;
+      _ffmpegPath = null;
+      return;
+    }
+    final file = await _ytDlpFileForAbi(abi);
+    if (await file.exists()) {
+      await file.delete();
+    }
+    _ready = false;
+    _ytDlpPath = null;
+    _ffmpegPath = null;
+  }
+
+  /// Re-evaluates whether yt-dlp is installed and executable.
+  Future<bool> refreshStatus() async {
+    final abi = _currentAbi();
+    if (abi == null) {
+      _ready = false;
+      _ytDlpPath = null;
+      _ffmpegPath = null;
+      return false;
     }
 
-    await _prepareFromAssets(abi);
+    final file = await _ytDlpFileForAbi(abi);
+    if (await file.exists() && await file.length() > 0) {
+      _ytDlpPath = file.path;
+      _ffmpegPath = null;
+      _ready = true;
+      return true;
+    }
 
-    _ready = true;
+    _ytDlpPath = null;
+    _ffmpegPath = null;
+    _ready = false;
+    return false;
   }
 
   // -- helpers ---------------------------------------------------------------
-
-  Future<String> _resolveBundledAndroidBinary(String filename) async {
-    final nativeLibDir =
-        await _runtimeChannel.invokeMethod<String>('getNativeLibraryDir');
-    if (nativeLibDir == null || nativeLibDir.isEmpty) {
-      throw StateError('Failed to resolve Android native library directory.');
-    }
-
-    final file = File('$nativeLibDir/$filename');
-    if (!await file.exists()) {
-      throw FileSystemException(
-        'Bundled binary "$filename" not found in native library directory. '
-        'Run frontend/scripts/download_binaries.sh before building the APK.',
-        file.path,
-      );
-    }
-
-    return file.path;
-  }
-
-  Future<String?> _tryResolveBundledAndroidBinary(String filename) async {
-    try {
-      return await _resolveBundledAndroidBinary(filename);
-    } on FileSystemException catch (e) {
-      debugPrint(
-        'Optional Android binary "$filename" is unavailable. '
-        'Audio extraction and best-stream merge features may be limited: '
-        '${e.message} (${e.path ?? 'no-path'})',
-      );
-      return null;
-    } catch (e) {
-      debugPrint(
-        'Optional Android binary "$filename" resolution failed: $e',
-      );
-      return null;
-    }
-  }
 
   /// Maps the current [Abi] to an Android ABI directory name.
   String? _currentAbi() {
@@ -127,59 +152,21 @@ class BinaryManager {
     }
   }
 
-  Future<void> _prepareFromAssets(String abi) async {
+  Future<File> _ytDlpFileForAbi(String abi) async {
     final dir = await getApplicationSupportDirectory();
-    final binDir = Directory('${dir.path}/binaries/$abi');
-    await binDir.create(recursive: true);
-
-    try {
-      _ytDlpPath = await _extractAsset(
-        assetPath: 'assets/binaries/$abi/yt-dlp',
-        destFile: File('${binDir.path}/yt-dlp'),
-      );
-    } catch (e) {
-      throw StateError(
-        'yt-dlp binary is not bundled for ABI "$abi". '
-        'Run frontend/scripts/download_binaries.sh before building the APK. '
-        'Original error: $e',
-      );
-    }
-
-    // ffmpeg is optional - app still works for single-stream downloads without it.
-    try {
-      _ffmpegPath = await _extractAsset(
-        assetPath: 'assets/binaries/$abi/ffmpeg',
-        destFile: File('${binDir.path}/ffmpeg'),
-      );
-    } catch (_) {
-      _ffmpegPath = null;
-    }
+    return File('${dir.path}/binaries/$abi/yt-dlp');
   }
 
-  /// Copies [assetPath] from the Flutter bundle to [destFile] and makes it
-  /// executable. Skips the copy if the file already exists and is non-empty.
-  Future<String> _extractAsset({
-    required String assetPath,
-    required File destFile,
-  }) async {
-    if (!destFile.existsSync() || destFile.lengthSync() == 0) {
-      final data = await rootBundle.load(assetPath);
-      await destFile.writeAsBytes(
-        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
-        flush: true,
-      );
+  String _ytDlpDownloadUrl(String abi) {
+    switch (abi) {
+      case 'arm64-v8a':
+        return 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64';
+      case 'armeabi-v7a':
+        return 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_armv7l';
+      case 'x86_64':
+        return 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_x86_64';
+      default:
+        throw UnsupportedError('Unsupported ABI: $abi');
     }
-
-    final chmod = await Process.run('chmod', ['755', destFile.path]);
-    if (chmod.exitCode != 0) {
-      throw ProcessException(
-        'chmod',
-        ['755', destFile.path],
-        chmod.stderr.toString(),
-        chmod.exitCode,
-      );
-    }
-
-    return destFile.path;
   }
 }

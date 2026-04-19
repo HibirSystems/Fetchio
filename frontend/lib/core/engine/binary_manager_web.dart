@@ -14,6 +14,19 @@ class BinaryManager {
   bool get isReady => _ready;
 
   Future<void> ensureReady() async {
-    _ready = true;
+    throw UnsupportedError('Local yt-dlp binaries are not supported on web.');
+  }
+
+  Future<void> installOrUpdateYtDlp() {
+    throw UnsupportedError('Local yt-dlp binaries are not supported on web.');
+  }
+
+  Future<void> removeYtDlp() async {
+    _ready = false;
+  }
+
+  Future<bool> refreshStatus() async {
+    _ready = false;
+    return false;
   }
 }

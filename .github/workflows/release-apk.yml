@@ -50,10 +50,6 @@ jobs:
         working-directory: frontend
         run: flutter pub get
 
-      - name: Download yt-dlp + ffmpeg binaries
-        working-directory: frontend
-        run: bash scripts/download_binaries.sh
-
       - name: Decode keystore
         if: ${{ env.KEYSTORE_BASE64 != '' }}
         working-directory: frontend/android/app
@@ -85,15 +81,20 @@ jobs:
               --build-number="${{ github.run_number }}"
           fi
 
-      - name: Rename APK
+      - name: Prepare APK artifacts
         run: |
           VERSION="${{ steps.version.outputs.tag }}"
-          if [ -f "frontend/build/app/outputs/flutter-apk/app-release.apk" ]; then
-            mv frontend/build/app/outputs/flutter-apk/app-release.apk \
-               frontend/build/app/outputs/flutter-apk/fetchio-${VERSION}.apk
+          OUT_DIR="frontend/build/app/outputs/flutter-apk"
+
+          if ls "$OUT_DIR"/*-release.apk >/dev/null 2>&1; then
+            for apk in "$OUT_DIR"/*-release.apk; do
+              name="$(basename "$apk")"
+              abi="${name#app-}"
+              abi="${abi%-release.apk}"
+              cp "$apk" "$OUT_DIR/fetchio-${VERSION}-${abi}.apk"
+            done
           else
-            mv frontend/build/app/outputs/flutter-apk/app-debug.apk \
-               frontend/build/app/outputs/flutter-apk/fetchio-${VERSION}.apk
+            cp "$OUT_DIR/app-debug.apk" "$OUT_DIR/fetchio-${VERSION}-debug.apk"
           fi
 
       - name: Create GitHub Release
@@ -105,7 +106,8 @@ jobs:
             ## Fetchio ${{ steps.version.outputs.tag }}
 
             ### What's new
-            - **Fully standalone** — yt-dlp and ffmpeg run **on-device**, no backend server required.
+            - **Smaller APKs** with per-ABI release outputs.
+            - yt-dlp engine is now downloaded from **Settings** after app install.
             - Downloads are saved to the device Downloads / Gallery automatically.
             - Supports Android 7.0 (API 24) and above.
 
@@ -115,9 +117,8 @@ jobs:
             3. Open the downloaded APK and tap **Install**
 
             ### Notes
-            - The APK includes yt-dlp and ffmpeg binaries for arm64-v8a, armeabi-v7a, and x86_64.
-            - A universal APK (all ABIs) and per-ABI APKs are attached below.
-            - Binaries are bundled in Android native library directories for direct on-device execution.
+            - Open Settings and tap **Download Engine** once after installing.
+            - Choose the APK matching your device ABI for the smallest download size.
           files: frontend/build/app/outputs/flutter-apk/fetchio-*.apk
           draft: false
           prerelease: false

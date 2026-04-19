@@ -36,14 +36,15 @@ class YtDlpRunner {
   final Map<String, Process> _activeProcesses = {};
 
   Future<Map<String, dynamic>> extractInfo(String url) async {
+    await BinaryManager.instance.ensureReady();
     final ffmpegPath = BinaryManager.instance.ffmpegPath;
     final args = [
       '--dump-json',
       '--no-playlist',
       '--no-warnings',
       '--quiet',
-      if (ffmpegPath != null) ...['--ffmpeg-location', ffmpegPath]
-      else '--no-check-formats',
+      if (ffmpegPath != null) ...['--ffmpeg-location', ffmpegPath] else
+        '--no-check-formats',
       url,
     ];
 
@@ -62,6 +63,7 @@ class YtDlpRunner {
   }
 
   Future<List<Map<String, dynamic>>> search(String query, int limit) async {
+    await BinaryManager.instance.ensureReady();
     final result = await Process.run(
       BinaryManager.instance.ytDlpPath,
       [
@@ -78,10 +80,8 @@ class YtDlpRunner {
       throw Exception('yt-dlp search failed: $err');
     }
 
-    final lines = result.stdout
-        .toString()
-        .split('\n')
-        .where((l) => l.trim().isNotEmpty);
+    final lines =
+        result.stdout.toString().split('\n').where((l) => l.trim().isNotEmpty);
 
     final entries = <Map<String, dynamic>>[];
     for (final line in lines) {
@@ -129,6 +129,7 @@ class YtDlpRunner {
     String? audioFormat,
     required StreamController<YtDlpProgress> controller,
   }) async {
+    await BinaryManager.instance.ensureReady();
     final outtmpl = '$outputDir/%(title)s [%(id)s].%(ext)s';
     final hasFfmpeg = BinaryManager.instance.ffmpegPath != null;
 
@@ -188,7 +189,8 @@ class YtDlpRunner {
             controller.add(progress);
           }
         } else if (line.startsWith('[download] Destination:')) {
-          lastFilename = line.replaceFirst('[download] Destination:', '').trim();
+          lastFilename =
+              line.replaceFirst('[download] Destination:', '').trim();
         } else if (line.contains('Merging formats into')) {
           final match = RegExp(r'Merging formats into "(.+)"').firstMatch(line);
           if (match != null) lastFilename = match.group(1);
@@ -201,9 +203,9 @@ class YtDlpRunner {
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen(
-      (line) => stderrBuffer.writeln(line),
-      onError: (_) {},
-    );
+          (line) => stderrBuffer.writeln(line),
+          onError: (_) {},
+        );
 
     final exitCode = await process.exitCode;
     _activeProcesses.remove(downloadId);

@@ -59,6 +59,3 @@ flutter:
     - assets/images/
     - assets/animations/
     - assets/icons/
-    - assets/binaries/arm64-v8a/
-    - assets/binaries/armeabi-v7a/
-    - assets/binaries/x86_64/

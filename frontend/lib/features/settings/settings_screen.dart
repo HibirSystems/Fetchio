@@ -16,6 +16,9 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _appVersion = '';
+  bool _engineInstalled = false;
+  bool _engineBusy = false;
+  String? _engineError;
 
   @override
   void initState() {
@@ -23,6 +26,73 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     PackageInfo.fromPlatform().then((info) {
       if (mounted) setState(() => _appVersion = info.version);
     });
+    _refreshEngineStatus();
+  }
+
+  Future<void> _refreshEngineStatus() async {
+    final installed = await BinaryManager.instance.refreshStatus();
+    if (!mounted) return;
+    setState(() {
+      _engineInstalled = installed;
+      _engineError = null;
+    });
+  }
+
+  Future<void> _downloadOrUpdateEngine() async {
+    setState(() {
+      _engineBusy = true;
+      _engineError = null;
+    });
+
+    try {
+      await BinaryManager.instance.installOrUpdateYtDlp();
+      if (!mounted) return;
+      setState(() {
+        _engineInstalled = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('yt-dlp engine installed successfully')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _engineError = e.toString();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Engine install failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _engineBusy = false);
+      }
+    }
+  }
+
+  Future<void> _removeEngine() async {
+    setState(() {
+      _engineBusy = true;
+      _engineError = null;
+    });
+
+    try {
+      await BinaryManager.instance.removeYtDlp();
+      if (!mounted) return;
+      setState(() {
+        _engineInstalled = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('yt-dlp engine removed')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _engineError = e.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _engineBusy = false);
+      }
+    }
   }
 
   @override
@@ -50,8 +120,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: settings.themeMode == 'dark' ? 'Dark' : 'Light',
             trailing: Switch(
               value: settings.themeMode == 'dark',
-              onChanged: (v) =>
-                  notifier.setThemeMode(v ? 'dark' : 'light'),
+              onChanged: (v) => notifier.setThemeMode(v ? 'dark' : 'light'),
               activeColor: AppColors.primary,
             ),
           ),
@@ -99,19 +168,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const _SectionHeader(title: 'Engine'),
           _SettingsTile(
             icon: Icons.settings_applications_outlined,
-            title: 'yt-dlp (bundled)',
-            subtitle: BinaryManager.instance.isReady
-                ? 'Binary ready — runs fully on-device'
-                : 'Binary not yet extracted',
-            trailing: Icon(
-              BinaryManager.instance.isReady
-                  ? Icons.check_circle
-                  : Icons.hourglass_empty,
-              color: BinaryManager.instance.isReady
-                  ? AppColors.success
-                  : AppColors.warning,
-            ),
+            title: 'yt-dlp Engine',
+            subtitle: _engineInstalled
+                ? 'Installed locally (tap to update)'
+                : 'Not installed. Required for search and downloads.',
+            trailing: _engineBusy
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    _engineInstalled ? Icons.check_circle : Icons.download,
+                    color: _engineInstalled
+                        ? AppColors.success
+                        : AppColors.warning,
+                  ),
+            onTap: _engineBusy ? null : _downloadOrUpdateEngine,
           ),
+          _SettingsTile(
+            icon: Icons.delete_outline,
+            title: 'Remove Engine',
+            subtitle: 'Delete local yt-dlp binary to free up storage',
+            trailing: Icon(
+              Icons.chevron_right,
+              color:
+                  _engineInstalled ? AppColors.textHint : AppColors.darkDivider,
+            ),
+            onTap: _engineInstalled && !_engineBusy ? _removeEngine : null,
+          ),
+          if (_engineError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _engineError!,
+              style: const TextStyle(color: AppColors.error, fontSize: 12),
+            ),
+          ],
 
           const SizedBox(height: 16),
 
@@ -165,8 +257,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   value: opt.$1,
                   groupValue: settings.preferredQuality,
                   title: Text(opt.$2,
-                      style:
-                          const TextStyle(color: AppColors.textPrimary)),
+                      style: const TextStyle(color: AppColors.textPrimary)),
                   activeColor: AppColors.primary,
                   onChanged: (v) {
                     if (v != null) {
@@ -231,17 +322,14 @@ class _SettingsTile extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: AppColors.primary, size: 22),
         title: Text(title,
-            style: const TextStyle(
-                color: AppColors.textPrimary, fontSize: 14)),
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14)),
         subtitle: subtitle != null
             ? Text(subtitle!,
-                style: const TextStyle(
-                    color: AppColors.textHint, fontSize: 12))
+                style: const TextStyle(color: AppColors.textHint, fontSize: 12))
             : null,
         trailing: trailing ??
             (onTap != null
-                ? const Icon(Icons.chevron_right,
-                    color: AppColors.textHint)
+                ? const Icon(Icons.chevron_right, color: AppColors.textHint)
                 : null),
         onTap: onTap,
       ),

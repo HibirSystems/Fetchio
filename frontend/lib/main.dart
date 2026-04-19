@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-import 'core/engine/binary_manager.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
@@ -26,9 +25,6 @@ void main() async {
 
   // Initialize Hive.
   await Hive.initFlutter();
-
-  // Resolve bundled yt-dlp + ffmpeg binaries and prepare runtime paths.
-  await BinaryManager.instance.ensureReady();
 
   runApp(const ProviderScope(child: FetchioApp()));
 }
