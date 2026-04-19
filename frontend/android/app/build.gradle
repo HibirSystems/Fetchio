@@ -51,22 +51,11 @@ android {
 
     defaultConfig {
         applicationId "com.hibir.fetchio"
-        // Raised to 24 to guarantee compatibility with the bundled binaries.
+        // Raised to 24 for modern Android compatibility.
         minSdkVersion 24
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
-    }
-
-    // Build per-ABI APKs so each variant only bundles the relevant binary,
-    // keeping the download size small.
-    splits {
-        abi {
-            enable true
-            reset()
-            include 'arm64-v8a', 'armeabi-v7a', 'x86_64'
-            universalApk false
-        }
     }
 
     signingConfigs {
