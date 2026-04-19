@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -13,7 +14,8 @@ class AppSettings {
     this.audioOnly = false,
     this.embedThumbnail = true,
     this.preferredQuality = '1080',
-  });
+    String? apiBaseUrl,
+  }) : apiBaseUrl = apiBaseUrl ?? _defaultApiBaseUrl();
 
   String themeMode;
   int maxConcurrentDownloads;
@@ -21,6 +23,7 @@ class AppSettings {
   bool audioOnly;
   bool embedThumbnail;
   String preferredQuality;
+  String apiBaseUrl;
 
   AppSettings copyWith({
     String? themeMode,
@@ -29,6 +32,7 @@ class AppSettings {
     bool? audioOnly,
     bool? embedThumbnail,
     String? preferredQuality,
+    String? apiBaseUrl,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -39,7 +43,20 @@ class AppSettings {
       audioOnly: audioOnly ?? this.audioOnly,
       embedThumbnail: embedThumbnail ?? this.embedThumbnail,
       preferredQuality: preferredQuality ?? this.preferredQuality,
+      apiBaseUrl: apiBaseUrl ?? this.apiBaseUrl,
     );
+  }
+}
+
+String _defaultApiBaseUrl() {
+  if (kIsWeb) {
+    return 'http://localhost:8000/api/v1';
+  }
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.android:
+      return 'http://10.0.2.2:8000/api/v1';
+    default:
+      return 'http://localhost:8000/api/v1';
   }
 }
 
@@ -110,13 +127,13 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
           defaultValue: state.maxConcurrentDownloads) as int,
       defaultDownloadFormat: _box.get('defaultDownloadFormat',
           defaultValue: state.defaultDownloadFormat) as String,
-      audioOnly:
-          _box.get('audioOnly', defaultValue: state.audioOnly) as bool,
-      embedThumbnail:
-          _box.get('embedThumbnail', defaultValue: state.embedThumbnail)
-              as bool,
+      audioOnly: _box.get('audioOnly', defaultValue: state.audioOnly) as bool,
+      embedThumbnail: _box.get('embedThumbnail',
+          defaultValue: state.embedThumbnail) as bool,
       preferredQuality: _box.get('preferredQuality',
           defaultValue: state.preferredQuality) as String,
+      apiBaseUrl:
+          _box.get('apiBaseUrl', defaultValue: state.apiBaseUrl) as String,
     );
   }
 
@@ -138,6 +155,13 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> setPreferredQuality(String quality) async {
     state = state.copyWith(preferredQuality: quality);
     await _box.put('preferredQuality', quality);
+  }
+
+  Future<void> setApiBaseUrl(String baseUrl) async {
+    final normalized =
+        baseUrl.trim().isEmpty ? _defaultApiBaseUrl() : baseUrl.trim();
+    state = state.copyWith(apiBaseUrl: normalized);
+    await _box.put('apiBaseUrl', normalized);
   }
 }
 

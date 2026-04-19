@@ -1,12 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/engine/local_media_repository.dart';
+import '../core/network/backend_search_repository.dart';
+import 'settings_provider.dart';
 import '../shared/models/search_result.dart';
 
 // ── Repository provider ───────────────────────────────────────────────────────
 
-final searchRepositoryProvider = Provider<LocalSearchRepository>((ref) {
-  return const LocalSearchRepository();
+final searchRepositoryProvider = Provider<BackendSearchRepository>((ref) {
+  final baseUrl = ref.watch(settingsProvider.select((s) => s.apiBaseUrl));
+  final repo = BackendSearchRepository(baseUrl);
+  ref.onDispose(repo.dispose);
+  return repo;
 });
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -54,7 +58,7 @@ class SearchState {
 class SearchNotifier extends StateNotifier<SearchState> {
   SearchNotifier(this._repo) : super(const SearchState());
 
-  final LocalSearchRepository _repo;
+  final BackendSearchRepository _repo;
   static const int _perPage = 20;
 
   Future<void> search(String query) async {
@@ -99,6 +103,7 @@ class SearchNotifier extends StateNotifier<SearchState> {
   void clear() => state = const SearchState();
 }
 
-final searchProvider = StateNotifierProvider<SearchNotifier, SearchState>((ref) {
+final searchProvider =
+    StateNotifierProvider<SearchNotifier, SearchState>((ref) {
   return SearchNotifier(ref.watch(searchRepositoryProvider));
 });

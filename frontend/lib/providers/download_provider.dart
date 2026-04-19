@@ -2,15 +2,18 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/engine/local_download_manager.dart';
+import '../core/network/backend_download_manager.dart';
 import '../shared/models/download_item.dart';
+import 'settings_provider.dart';
 
 // ── Notifier ──────────────────────────────────────────────────────────────────
 
 class DownloadNotifier extends StateNotifier<List<DownloadItem>> {
-  DownloadNotifier() : super([]);
+  DownloadNotifier(this._repo) : super([]);
 
-  final Map<String, StreamSubscription<DownloadItem>> _subscriptions = {};
+  final BackendDownloadManager _repo;
+  Timer? _pollTimer;
+  bool _refreshing = false;
 
   Future<DownloadItem> startDownload({
     required String url,
@@ -18,70 +21,89 @@ class DownloadNotifier extends StateNotifier<List<DownloadItem>> {
     bool audioOnly = false,
     String? convertTo,
     String preferredQuality = 'best',
+    bool embedThumbnail = true,
   }) async {
-    final item = await LocalDownloadManager.instance.startDownload(
+    final item = await _repo.startDownload(
       url: url,
       formatId: formatId,
+      formatSelector: _buildFormatSelector(
+        audioOnly: audioOnly,
+        preferredQuality: preferredQuality,
+      ),
       audioOnly: audioOnly,
       convertTo: convertTo,
-      preferredQuality: preferredQuality,
+      embedThumbnail: embedThumbnail,
     );
 
-    state = [item, ...state];
-    _subscribeToProgress(item.downloadId);
+    await _refreshFromBackend();
     return item;
   }
 
-  /// Populates state from the manager's in-memory list (e.g. after navigation).
-  void loadAll() {
-    state = LocalDownloadManager.instance.downloads;
-    for (final item in state.where((d) => d.isActive)) {
-      _subscribeToProgress(item.downloadId);
-    }
+  /// Populates state from the backend's list (e.g. after navigation).
+  Future<void> loadAll() async {
+    await _refreshFromBackend();
   }
 
   Future<void> cancel(String id) async {
-    await LocalDownloadManager.instance.cancelDownload(id);
-    _subscriptions[id]?.cancel();
-    _subscriptions.remove(id);
-    _reload();
+    await _repo.cancelDownload(id);
+    await _refreshFromBackend();
   }
 
   Future<void> clearCompleted() async {
-    await LocalDownloadManager.instance.clearCompleted();
-    await Future.wait(
-      _subscriptions.values.map((sub) async => sub.cancel()),
-    );
-    _subscriptions.clear();
-    _reload();
+    await _repo.clearCompleted();
+    await _refreshFromBackend();
   }
 
-  void _subscribeToProgress(String id) {
-    _subscriptions[id]?.cancel();
-    _subscriptions[id] =
-        LocalDownloadManager.instance.watchDownload(id).listen(
-      (updated) => _updateItem(id, updated),
-      onError: (_) => _subscriptions.remove(id),
-      onDone: () => _subscriptions.remove(id),
-    );
+  Future<void> _refreshFromBackend() async {
+    if (_refreshing) return;
+    _refreshing = true;
+    try {
+      state = await _repo.listDownloads();
+    } catch (_) {
+      // Keep the last known state when the backend is temporarily unavailable.
+    } finally {
+      _refreshing = false;
+      _syncPolling();
+    }
   }
 
-  void _updateItem(String id, DownloadItem updated) {
-    state = [
-      for (final d in state)
-        if (d.downloadId == id) updated else d,
-    ];
+  void _syncPolling() {
+    final hasActive = state.any((item) => item.isActive);
+    if (hasActive && _pollTimer == null) {
+      _pollTimer = Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => _refreshFromBackend(),
+      );
+    } else if (!hasActive && _pollTimer != null) {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+    }
   }
 
-  void _reload() {
-    state = List.of(LocalDownloadManager.instance.downloads);
+  String _buildFormatSelector({
+    required bool audioOnly,
+    required String preferredQuality,
+  }) {
+    if (audioOnly) {
+      return 'bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio';
+    }
+    switch (preferredQuality) {
+      case '1080':
+        return 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best';
+      case '720':
+        return 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best';
+      case '480':
+        return 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]/best';
+      case '360':
+        return 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=360]+bestaudio/best[height<=360]/best';
+      default:
+        return 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
+    }
   }
 
   @override
   void dispose() {
-    for (final sub in _subscriptions.values) {
-      sub.cancel();
-    }
+    _pollTimer?.cancel();
     super.dispose();
   }
 }
@@ -90,7 +112,10 @@ class DownloadNotifier extends StateNotifier<List<DownloadItem>> {
 
 final downloadProvider =
     StateNotifierProvider<DownloadNotifier, List<DownloadItem>>((ref) {
-  return DownloadNotifier();
+  final baseUrl = ref.watch(settingsProvider.select((s) => s.apiBaseUrl));
+  final repo = BackendDownloadManager(baseUrl);
+  ref.onDispose(repo.dispose);
+  return DownloadNotifier(repo);
 });
 
 final activeDownloadCountProvider = Provider<int>((ref) {

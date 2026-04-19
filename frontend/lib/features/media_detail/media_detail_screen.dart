@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../providers/media_provider.dart';
 import '../../providers/download_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../shared/models/media_info.dart';
 import '../../shared/widgets/download_options_modal.dart';
 
@@ -38,7 +38,8 @@ class _MediaDetailContent extends ConsumerWidget {
     final h = d.inHours;
     final m = d.inMinutes.remainder(60);
     final s = d.inSeconds.remainder(60);
-    if (h > 0) return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    if (h > 0)
+      return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
     return '$m:${s.toString().padLeft(2, '0')}';
   }
 
@@ -51,8 +52,6 @@ class _MediaDetailContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final numberFmt = NumberFormat.decimalPattern();
-
     return CustomScrollView(
       slivers: [
         // App bar with thumbnail
@@ -132,14 +131,16 @@ class _MediaDetailContent extends ConsumerWidget {
               const SizedBox(height: 8),
 
               // Title
-              Text(info.title, style: AppTextStyles.displayLarge.copyWith(fontSize: 22)),
+              Text(info.title,
+                  style: AppTextStyles.displayLarge.copyWith(fontSize: 22)),
               const SizedBox(height: 8),
 
               // Uploader
               if (info.uploader != null)
                 Row(
                   children: [
-                    const Icon(Icons.person, size: 14, color: AppColors.textHint),
+                    const Icon(Icons.person,
+                        size: 14, color: AppColors.textHint),
                     const SizedBox(width: 4),
                     Text(info.uploader!,
                         style: const TextStyle(
@@ -153,7 +154,8 @@ class _MediaDetailContent extends ConsumerWidget {
               Row(
                 children: [
                   if (info.viewCount != null) ...[
-                    const Icon(Icons.visibility, size: 14, color: AppColors.textHint),
+                    const Icon(Icons.visibility,
+                        size: 14, color: AppColors.textHint),
                     const SizedBox(width: 4),
                     Text(_formatCount(info.viewCount),
                         style: const TextStyle(
@@ -161,7 +163,8 @@ class _MediaDetailContent extends ConsumerWidget {
                     const SizedBox(width: 16),
                   ],
                   if (info.likeCount != null) ...[
-                    const Icon(Icons.thumb_up, size: 14, color: AppColors.textHint),
+                    const Icon(Icons.thumb_up,
+                        size: 14, color: AppColors.textHint),
                     const SizedBox(width: 4),
                     Text(_formatCount(info.likeCount),
                         style: const TextStyle(
@@ -188,20 +191,34 @@ class _MediaDetailContent extends ConsumerWidget {
                       builder: (_) => DownloadOptionsModal(
                         mediaInfo: info,
                         onDownload: (req) async {
-                          await ref
-                              .read(downloadProvider.notifier)
-                              .startDownload(
-                                url: req['url'] as String,
-                                formatId: req['format_id'] as String?,
-                                audioOnly: req['audio_only'] as bool? ?? false,
-                                convertTo: req['convert_to'] as String?,
+                          try {
+                            await ref
+                                .read(downloadProvider.notifier)
+                                .startDownload(
+                                  url: req['url'] as String,
+                                  formatId: req['format_id'] as String?,
+                                  audioOnly:
+                                      req['audio_only'] as bool? ?? false,
+                                  convertTo: req['convert_to'] as String?,
+                                  embedThumbnail:
+                                      req['embed_thumbnail'] as bool? ?? true,
+                                  preferredQuality: ref
+                                      .read(settingsProvider)
+                                      .preferredQuality,
+                                );
+                            if (context.mounted) {
+                              Navigator.of(context).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Download started!')),
                               );
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Download started!')),
-                            );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Download failed: $e')),
+                              );
+                            }
                           }
                         },
                       ),
@@ -227,7 +244,8 @@ class _MediaDetailContent extends ConsumerWidget {
 
               // Available formats
               if (info.formats.isNotEmpty) ...[
-                const Text('Available Formats', style: AppTextStyles.titleMedium),
+                const Text('Available Formats',
+                    style: AppTextStyles.titleMedium),
                 const SizedBox(height: 12),
                 ...info.formats
                     .where((f) => f.vcodec != null && f.vcodec != 'none')
@@ -272,7 +290,9 @@ class _ExpandableTextState extends State<_ExpandableText> {
           child: Text(
             _expanded ? 'Show less' : 'Show more',
             style: const TextStyle(
-                color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13),
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13),
           ),
         ),
       ],
@@ -287,7 +307,8 @@ class _FormatTile extends StatelessWidget {
   String _filesize() {
     final bytes = format.effectiveFilesize;
     if (bytes == null) return '';
-    if (bytes >= 1073741824) return '${(bytes / 1073741824).toStringAsFixed(1)} GB';
+    if (bytes >= 1073741824)
+      return '${(bytes / 1073741824).toStringAsFixed(1)} GB';
     if (bytes >= 1048576) return '${(bytes / 1048576).toStringAsFixed(1)} MB';
     return '${(bytes / 1024).toStringAsFixed(0)} KB';
   }
@@ -312,7 +333,9 @@ class _FormatTile extends StatelessWidget {
             child: Text(
               format.ext.toUpperCase(),
               style: const TextStyle(
-                  color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold),
+                  color: AppColors.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(width: 10),
@@ -323,13 +346,14 @@ class _FormatTile extends StatelessWidget {
                 if (format.fps != null) '${format.fps!.toInt()}fps',
                 if (format.formatNote != null) format.formatNote,
               ].join(' • '),
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+              style:
+                  const TextStyle(color: AppColors.textPrimary, fontSize: 13),
             ),
           ),
           if (_filesize().isNotEmpty)
             Text(_filesize(),
-                style: const TextStyle(
-                    color: AppColors.textHint, fontSize: 11)),
+                style:
+                    const TextStyle(color: AppColors.textHint, fontSize: 11)),
         ],
       ),
     );
@@ -375,8 +399,8 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 8),
             Text(error,
                 textAlign: TextAlign.center,
-                style:
-                    const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                style: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 12)),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () => context.go('/'),

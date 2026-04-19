@@ -1,10 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/engine/local_media_repository.dart';
+import '../core/network/backend_media_repository.dart';
+import 'settings_provider.dart';
 import '../shared/models/media_info.dart';
 
-final mediaRepositoryProvider = Provider<LocalMediaRepository>((ref) {
-  return const LocalMediaRepository();
+final mediaRepositoryProvider = Provider<BackendMediaRepository>((ref) {
+  final baseUrl = ref.watch(settingsProvider.select((s) => s.apiBaseUrl));
+  final repo = BackendMediaRepository(baseUrl);
+  ref.onDispose(repo.dispose);
+  return repo;
 });
 
 final mediaInfoProvider =

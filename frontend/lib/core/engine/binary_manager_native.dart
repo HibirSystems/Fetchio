@@ -53,8 +53,10 @@ class BinaryManager {
     }
 
     final url = _ytDlpDownloadUrl(abi);
-    final tempDir = await getTemporaryDirectory();
-    final downloadedFile = File('${tempDir.path}/yt-dlp_download_$abi.bin');
+    final supportDir = await getApplicationSupportDirectory();
+    final installedFile = File('${supportDir.path}/binaries/$abi/yt-dlp');
+
+    await installedFile.parent.create(recursive: true);
 
     final client = HttpClient();
     try {
@@ -68,34 +70,35 @@ class BinaryManager {
         );
       }
 
-      final sink = downloadedFile.openWrite();
+      final sink = installedFile.openWrite();
       await response.pipe(sink);
       await sink.flush();
       await sink.close();
 
-      for (final target in await _candidateBinaryFiles(abi)) {
-        await target.parent.create(recursive: true);
-        await downloadedFile.copy(target.path);
-
-        if (await _ensureExecutable(target) && await _isRunnable(target)) {
-          _ytDlpPath = target.path;
+      if (await installedFile.exists() && await installedFile.length() > 0) {
+        await _ensureExecutable(installedFile);
+        if (await _isRunnable(installedFile)) {
+          _ytDlpPath = installedFile.path;
           _ffmpegPath = null;
           _ready = true;
           return;
         }
       }
 
-      throw Exception(
-        'Downloaded yt-dlp could not be executed on this device. '
-        'Using bundled engine instead (bundled version will be used automatically).',
-      );
+      final bundled = await _resolveBundledAndroidBinary('libfetchio_ytdlp.so');
+      if (bundled != null && await _isRunnable(File(bundled))) {
+        _ytDlpPath = bundled;
+        _ffmpegPath =
+            await _resolveBundledAndroidBinary('libfetchio_ffmpeg.so');
+        _ready = true;
+        return;
+      }
+
+      _ytDlpPath = null;
+      _ffmpegPath = null;
+      _ready = false;
     } finally {
       client.close(force: true);
-      if (await downloadedFile.exists()) {
-        try {
-          await downloadedFile.delete();
-        } catch (_) {}
-      }
     }
   }
 
@@ -177,8 +180,8 @@ class BinaryManager {
     final supportDir = await getApplicationSupportDirectory();
     final tempDir = await getTemporaryDirectory();
     return [
-      File('${tempDir.path}/binaries/$abi/yt-dlp'),
       File('${supportDir.path}/binaries/$abi/yt-dlp'),
+      File('${tempDir.path}/binaries/$abi/yt-dlp'),
     ];
   }
 

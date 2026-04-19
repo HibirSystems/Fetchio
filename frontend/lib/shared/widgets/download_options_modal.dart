@@ -21,7 +21,6 @@ class _DownloadOptionsModalState extends State<DownloadOptionsModal> {
   String _mode = 'video'; // 'video' | 'audio'
   String? _selectedFormatId;
   String _audioFormat = 'mp3';
-  final String _quality = 'best';
   bool _embedThumbnail = true;
 
   // Sensible video quality options derived from available formats

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../core/engine/binary_manager.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/settings_provider.dart';
 
@@ -16,9 +15,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _appVersion = '';
-  bool _engineInstalled = false;
-  bool _engineBusy = false;
-  String? _engineError;
 
   @override
   void initState() {
@@ -26,73 +22,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     PackageInfo.fromPlatform().then((info) {
       if (mounted) setState(() => _appVersion = info.version);
     });
-    _refreshEngineStatus();
-  }
-
-  Future<void> _refreshEngineStatus() async {
-    final installed = await BinaryManager.instance.refreshStatus();
-    if (!mounted) return;
-    setState(() {
-      _engineInstalled = installed;
-      _engineError = null;
-    });
-  }
-
-  Future<void> _downloadOrUpdateEngine() async {
-    setState(() {
-      _engineBusy = true;
-      _engineError = null;
-    });
-
-    try {
-      await BinaryManager.instance.installOrUpdateYtDlp();
-      if (!mounted) return;
-      setState(() {
-        _engineInstalled = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('yt-dlp engine installed successfully')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _engineError = e.toString();
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Engine install failed: $e')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _engineBusy = false);
-      }
-    }
-  }
-
-  Future<void> _removeEngine() async {
-    setState(() {
-      _engineBusy = true;
-      _engineError = null;
-    });
-
-    try {
-      await BinaryManager.instance.removeYtDlp();
-      if (!mounted) return;
-      setState(() {
-        _engineInstalled = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('yt-dlp engine removed')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _engineError = e.toString();
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _engineBusy = false);
-      }
-    }
   }
 
   @override
@@ -164,45 +93,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const SizedBox(height: 16),
 
-          // ── Engine ────────────────────────────────────────────────────────
-          const _SectionHeader(title: 'Engine'),
+          const _SectionHeader(title: 'Backend'),
           _SettingsTile(
-            icon: Icons.settings_applications_outlined,
-            title: 'yt-dlp Engine',
-            subtitle: _engineInstalled
-                ? 'Available • Tap to download latest version'
-                : 'Available (bundled) • Optional update available',
-            trailing: _engineBusy
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(
-                    Icons.check_circle,
-                    color: AppColors.success,
-                  ),
-            onTap: _engineBusy ? null : _downloadOrUpdateEngine,
+            icon: Icons.cloud_outlined,
+            title: 'API Base URL',
+            subtitle: settings.apiBaseUrl,
+            onTap: () => _editApiBaseUrl(context, settings, notifier),
           ),
-          _SettingsTile(
-            icon: Icons.delete_outline,
-            title: 'Remove Downloaded Version',
-            subtitle:
-                'Delete downloaded yt-dlp to free up storage (bundled remains)',
-            trailing: Icon(
-              Icons.chevron_right,
-              color:
-                  _engineInstalled ? AppColors.textHint : AppColors.darkDivider,
-            ),
-            onTap: _engineInstalled && !_engineBusy ? _removeEngine : null,
-          ),
-          if (_engineError != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _engineError!,
-              style: const TextStyle(color: AppColors.error, fontSize: 12),
-            ),
-          ],
 
           const SizedBox(height: 16),
 
@@ -221,6 +118,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _editApiBaseUrl(
+    BuildContext context,
+    AppSettings settings,
+    SettingsNotifier notifier,
+  ) async {
+    final controller = TextEditingController(text: settings.apiBaseUrl);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.darkSurface,
+          title: const Text('API Base URL'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(
+              hintText: 'http://10.0.2.2:8000/api/v1',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await notifier.setApiBaseUrl(controller.text);
+    }
+
+    controller.dispose();
   }
 
   void _showQualityPicker(
