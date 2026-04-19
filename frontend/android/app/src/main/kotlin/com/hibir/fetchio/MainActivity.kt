@@ -6,7 +6,6 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     companion object {
-        private const val MEDIA_STORE_CHANNEL = "com.hibir.fetchio/media_store"
         private const val RUNTIME_CHANNEL = "com.hibir.fetchio/runtime"
     }
 
@@ -15,7 +14,7 @@ class MainActivity : FlutterActivity() {
         val bridge = MediaStoreBridge(this)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            MEDIA_STORE_CHANNEL,
+            MediaStoreBridge.CHANNEL,
         ).setMethodCallHandler(bridge)
 
         MethodChannel(

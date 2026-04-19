@@ -98,7 +98,10 @@ class BinaryManager {
   Future<String?> _tryResolveBundledAndroidBinary(String filename) async {
     try {
       return await _resolveBundledAndroidBinary(filename);
-    } catch (_) {
+    } catch (e) {
+      stderr.writeln(
+        'Optional Android binary "$filename" is unavailable: $e',
+      );
       return null;
     }
   }
