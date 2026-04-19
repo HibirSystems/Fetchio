@@ -27,8 +27,7 @@ void main() async {
   // Initialize Hive.
   await Hive.initFlutter();
 
-  // Extract bundled yt-dlp + ffmpeg binaries from assets to the private
-  // app storage directory so they can be executed.
+  // Resolve bundled yt-dlp + ffmpeg binaries and prepare runtime paths.
   await BinaryManager.instance.ensureReady();
 
   runApp(const ProviderScope(child: FetchioApp()));

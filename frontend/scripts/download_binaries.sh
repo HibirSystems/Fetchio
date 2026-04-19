@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Downloads yt-dlp and ffmpeg standalone binaries for all supported Android ABIs.
+# Downloads yt-dlp and ffmpeg binaries and places them in Android jniLibs.
 #
 # Run this before `flutter build apk` when building locally:
 #   cd frontend && bash scripts/download_binaries.sh
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ASSETS_DIR="$SCRIPT_DIR/../assets/binaries"
+JNILIBS_DIR="$SCRIPT_DIR/../android/app/src/main/jniLibs"
 
 # ── yt-dlp ────────────────────────────────────────────────────────────────────
 
@@ -31,8 +31,8 @@ echo "==> Downloading yt-dlp ${YTDLP_VERSION}"
 download_ytdlp() {
   local abi="$1"
   local upstream_name="$2"
-  local dest="${ASSETS_DIR}/${abi}/yt-dlp"
-  mkdir -p "${ASSETS_DIR}/${abi}"
+  local dest="${JNILIBS_DIR}/${abi}/libfetchio_ytdlp.so"
+  mkdir -p "${JNILIBS_DIR}/${abi}"
   echo "    [yt-dlp] ${abi} <- ${upstream_name}"
   curl -L --retry 3 -o "${dest}" "${YTDLP_BASE}/${upstream_name}"
   chmod 755 "${dest}"
@@ -55,7 +55,7 @@ download_ffmpeg() {
   local abi="$1"
   local archive_name="$2"
   local inner_binary="$3"   # path inside the tar.xz
-  local dest="${ASSETS_DIR}/${abi}/ffmpeg"
+  local dest="${JNILIBS_DIR}/${abi}/libfetchio_ffmpeg.so"
   local tmp_dir
   tmp_dir="$(mktemp -d)"
 
@@ -72,5 +72,5 @@ download_ffmpeg "armeabi-v7a" "ffmpeg-release-armhf-static.tar.xz" "ffmpeg"
 download_ffmpeg "x86_64"      "ffmpeg-release-amd64-static.tar.xz" "ffmpeg"
 
 echo ""
-echo "==> Done.  Binaries written to assets/binaries/"
-ls -lh "${ASSETS_DIR}/arm64-v8a/"
+echo "==> Done.  Binaries written to android/app/src/main/jniLibs/"
+ls -lh "${JNILIBS_DIR}/arm64-v8a/"
