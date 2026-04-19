@@ -11,6 +11,9 @@ class BinaryManager {
 
   static const String _engineMissingMessage =
       'yt-dlp engine is not installed. Open Settings > Engine and tap "Download Engine".';
+  static const String _engineNotExecutableMessage =
+      'yt-dlp was downloaded but cannot be executed on this device. '
+      'This Android build may block executable files in app storage.';
 
   String? _ytDlpPath;
   String? _ffmpegPath;
@@ -49,12 +52,9 @@ class BinaryManager {
       );
     }
 
-    final dir = await getApplicationSupportDirectory();
-    final binDir = Directory('${dir.path}/binaries/$abi');
-    await binDir.create(recursive: true);
-
-    final file = File('${binDir.path}/yt-dlp');
     final url = _ytDlpDownloadUrl(abi);
+    final tempDir = await getTemporaryDirectory();
+    final downloadedFile = File('${tempDir.path}/yt-dlp_download_$abi.bin');
 
     final client = HttpClient();
     try {
@@ -68,26 +68,31 @@ class BinaryManager {
         );
       }
 
-      final sink = file.openWrite();
+      final sink = downloadedFile.openWrite();
       await response.pipe(sink);
       await sink.flush();
       await sink.close();
 
-      final chmod = await Process.run('chmod', ['755', file.path]);
-      if (chmod.exitCode != 0) {
-        throw ProcessException(
-          'chmod',
-          ['755', file.path],
-          chmod.stderr.toString(),
-          chmod.exitCode,
-        );
+      for (final target in await _candidateBinaryFiles(abi)) {
+        await target.parent.create(recursive: true);
+        await downloadedFile.copy(target.path);
+
+        if (await _ensureExecutable(target) && await _isRunnable(target)) {
+          _ytDlpPath = target.path;
+          _ffmpegPath = null;
+          _ready = true;
+          return;
+        }
       }
 
-      _ytDlpPath = file.path;
-      _ffmpegPath = null;
-      _ready = true;
+      throw StateError(_engineNotExecutableMessage);
     } finally {
       client.close(force: true);
+      if (await downloadedFile.exists()) {
+        try {
+          await downloadedFile.delete();
+        } catch (_) {}
+      }
     }
   }
 
@@ -100,9 +105,10 @@ class BinaryManager {
       _ffmpegPath = null;
       return;
     }
-    final file = await _ytDlpFileForAbi(abi);
-    if (await file.exists()) {
-      await file.delete();
+    for (final file in await _candidateBinaryFiles(abi)) {
+      if (await file.exists()) {
+        await file.delete();
+      }
     }
     _ready = false;
     _ytDlpPath = null;
@@ -119,12 +125,13 @@ class BinaryManager {
       return false;
     }
 
-    final file = await _ytDlpFileForAbi(abi);
-    if (await file.exists() && await file.length() > 0) {
-      _ytDlpPath = file.path;
-      _ffmpegPath = null;
-      _ready = true;
-      return true;
+    for (final file in await _candidateBinaryFiles(abi)) {
+      if (await _isRunnable(file)) {
+        _ytDlpPath = file.path;
+        _ffmpegPath = null;
+        _ready = true;
+        return true;
+      }
     }
 
     _ytDlpPath = null;
@@ -152,9 +159,45 @@ class BinaryManager {
     }
   }
 
-  Future<File> _ytDlpFileForAbi(String abi) async {
-    final dir = await getApplicationSupportDirectory();
-    return File('${dir.path}/binaries/$abi/yt-dlp');
+  Future<List<File>> _candidateBinaryFiles(String abi) async {
+    final supportDir = await getApplicationSupportDirectory();
+    final tempDir = await getTemporaryDirectory();
+    return [
+      File('${tempDir.path}/binaries/$abi/yt-dlp'),
+      File('${supportDir.path}/binaries/$abi/yt-dlp'),
+    ];
+  }
+
+  Future<bool> _ensureExecutable(File file) async {
+    final commands = <List<String>>[
+      ['chmod', '755', file.path],
+      ['/system/bin/chmod', '755', file.path],
+      ['toybox', 'chmod', '755', file.path],
+    ];
+
+    for (final cmd in commands) {
+      try {
+        final result = await Process.run(cmd.first, cmd.sublist(1));
+        if (result.exitCode == 0) return true;
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  Future<bool> _isRunnable(File file) async {
+    if (!await file.exists()) return false;
+    if (await file.length() == 0) return false;
+
+    await _ensureExecutable(file);
+
+    try {
+      final result = await Process.run(file.path, ['--version']);
+      return result.exitCode == 0;
+    } on ProcessException {
+      return false;
+    } catch (_) {
+      return false;
+    }
   }
 
   String _ytDlpDownloadUrl(String abi) {
