@@ -90,8 +90,8 @@ android {
     }
 
     packagingOptions {
-        doNotStrip "*/libfetchio_ytdlp.so"
-        doNotStrip "*/libfetchio_ffmpeg.so"
+        doNotStrip "lib/*/libfetchio_ytdlp.so"
+        doNotStrip "lib/*/libfetchio_ffmpeg.so"
     }
 }
 

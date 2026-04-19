@@ -100,10 +100,17 @@ class BinaryManager {
   Future<String?> _tryResolveBundledAndroidBinary(String filename) async {
     try {
       return await _resolveBundledAndroidBinary(filename);
-    } catch (e) {
+    } on FileSystemException catch (e) {
       debugPrint(
         'Optional Android binary "$filename" is unavailable. '
-        'Audio extraction and best-stream merge features may be limited: $e',
+        'Audio extraction and best-stream merge features may be limited: '
+        '[${e.runtimeType}] $e',
+      );
+      return null;
+    } catch (e) {
+      debugPrint(
+        'Optional Android binary "$filename" resolution failed: '
+        '[${e.runtimeType}] $e',
       );
       return null;
     }
