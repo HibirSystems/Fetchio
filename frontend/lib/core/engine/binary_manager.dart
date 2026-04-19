@@ -1,6 +1,7 @@
 import 'dart:ffi' show Abi;
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart' show MethodChannel, rootBundle;
 import 'package:path_provider/path_provider.dart';
 
@@ -99,9 +100,9 @@ class BinaryManager {
     try {
       return await _resolveBundledAndroidBinary(filename);
     } catch (e) {
-      stderr.writeln(
+      debugPrint(
         'Optional Android binary "$filename" is unavailable. '
-        'Some conversions/merging features may be limited: $e',
+        'Audio extraction and best-stream merge features may be limited: $e',
       );
       return null;
     }
