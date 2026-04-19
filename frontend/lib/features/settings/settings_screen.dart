@@ -52,7 +52,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               value: settings.themeMode == 'dark',
               onChanged: (v) =>
                   notifier.setThemeMode(v ? 'dark' : 'light'),
-              activeThumbColor: AppColors.primary,
+              activeColor: AppColors.primary,
             ),
           ),
 
@@ -67,7 +67,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             trailing: Switch(
               value: settings.audioOnly,
               onChanged: notifier.setAudioOnly,
-              activeThumbColor: AppColors.primary,
+              activeColor: AppColors.primary,
             ),
           ),
           _SettingsTile(
@@ -89,7 +89,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             trailing: Switch(
               value: settings.embedThumbnail,
               onChanged: notifier.setEmbedThumbnail,
-              activeThumbColor: AppColors.primary,
+              activeColor: AppColors.primary,
             ),
           ),
 
