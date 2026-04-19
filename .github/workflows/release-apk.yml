@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
     steps:
       - name: Checkout
@@ -53,12 +55,12 @@ jobs:
         run: bash scripts/download_binaries.sh
 
       - name: Decode keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
         working-directory: frontend/android/app
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > release.jks
+        run: echo "$KEYSTORE_BASE64" | base64 --decode > release.jks
 
       - name: Create key.properties
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
         working-directory: frontend/android
         run: |
           cat > key.properties << 'EOF'
