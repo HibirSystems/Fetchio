@@ -138,12 +138,12 @@ class AppTheme {
         color: AppColors.primary,
         linearTrackColor: AppColors.darkCard,
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: AppColors.darkCard,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         margin: EdgeInsets.zero,
-      ),
+      ) as dynamic,
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.darkCard,
         contentTextStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary),
