@@ -47,11 +47,11 @@ class DownloadNotifier extends StateNotifier<List<DownloadItem>> {
     _reload();
   }
 
-  void clearCompleted() {
-    LocalDownloadManager.instance.clearCompleted();
-    for (final sub in _subscriptions.values) {
-      sub.cancel();
-    }
+  Future<void> clearCompleted() async {
+    await LocalDownloadManager.instance.clearCompleted();
+    await Future.wait(
+      _subscriptions.values.map((sub) async => sub.cancel()),
+    );
     _subscriptions.clear();
     _reload();
   }

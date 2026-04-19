@@ -268,7 +268,7 @@ class YtDlpRunner {
     final parts = raw.split('|');
     if (parts.length < 5) return null;
 
-    int? parse(String s) {
+    int? parseInt(String s) {
       final cleaned = s.trim().replaceAll(RegExp(r'[^\d.]'), '');
       if (cleaned.isEmpty) return null;
       return double.tryParse(cleaned)?.toInt();
@@ -280,10 +280,10 @@ class YtDlpRunner {
     }
 
     return YtDlpProgress(
-      downloadedBytes: parse(parts[0]) ?? 0,
-      totalBytes: parse(parts[1]),
+      downloadedBytes: parseInt(parts[0]) ?? 0,
+      totalBytes: parseInt(parts[1]),
       speed: parseDouble(parts[2]),
-      eta: parse(parts[3]),
+      eta: parseInt(parts[3]),
       status: parts[4].trim().isEmpty ? 'downloading' : parts[4].trim(),
     );
   }

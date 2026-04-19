@@ -105,6 +105,8 @@ class LocalDownloadManager {
   /// Cancels an active download.
   Future<void> cancelDownload(String id) async {
     YtDlpRunner.instance.cancelDownload(id);
+    // Update state synchronously before closing the controller so the final
+    // cancelled status is delivered to any active listeners.
     _updateState(
       id,
       (d) => DownloadItem(
@@ -118,20 +120,20 @@ class LocalDownloadManager {
         updatedAt: DateTime.now(),
       ),
     );
-    await _controllers[id]?.close();
-    _controllers.remove(id);
+    final ctrl = _controllers.remove(id);
+    await ctrl?.close();
   }
 
   /// Removes all completed / failed / cancelled downloads from memory.
-  void clearCompleted() {
+  Future<void> clearCompleted() async {
     final toRemove = _downloads.values
         .where((d) => d.isTerminal)
         .map((d) => d.downloadId)
         .toList();
     for (final id in toRemove) {
       _downloads.remove(id);
-      _controllers[id]?.close();
-      _controllers.remove(id);
+      final ctrl = _controllers.remove(id);
+      await ctrl?.close();
     }
   }
 
