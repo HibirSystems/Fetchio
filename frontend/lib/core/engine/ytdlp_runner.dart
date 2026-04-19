@@ -47,21 +47,20 @@ class YtDlpRunner {
   ///
   /// Returns the raw yt-dlp JSON as a [Map].
   Future<Map<String, dynamic>> extractInfo(String url) async {
+    final ffmpegPath = BinaryManager.instance.ffmpegPath;
+    final args = [
+      '--dump-json',
+      '--no-playlist',
+      '--no-warnings',
+      '--quiet',
+      if (ffmpegPath != null) ...['--ffmpeg-location', ffmpegPath]
+      else '--no-check-formats',
+      url,
+    ];
+
     final result = await Process.run(
       BinaryManager.instance.ytDlpPath,
-      [
-        '--dump-json',
-        '--no-playlist',
-        '--no-warnings',
-        '--quiet',
-        if (BinaryManager.instance.ffmpegPath != null)
-          '--ffmpeg-location'
-        else
-          '--no-check-formats',
-        if (BinaryManager.instance.ffmpegPath != null)
-          BinaryManager.instance.ffmpegPath!,
-        url,
-      ].whereType<String>().toList(),
+      args,
     );
 
     if (result.exitCode != 0) {
@@ -205,7 +204,6 @@ class YtDlpRunner {
     _activeProcesses[downloadId] = process;
 
     String? lastFilename;
-    bool hasError = false;
     final stderrBuffer = StringBuffer();
 
     // Parse stdout line by line.
@@ -252,7 +250,6 @@ class YtDlpRunner {
         ),
       );
     } else {
-      hasError = true;
       final errMsg = stderrBuffer.toString().trim();
       controller.addError(Exception(
         exitCode == -15
@@ -261,9 +258,6 @@ class YtDlpRunner {
       ));
     }
 
-    if (!hasError || exitCode == -15) {
-      // Normal close.
-    }
     await controller.close();
   }
 

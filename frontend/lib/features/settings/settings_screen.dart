@@ -16,16 +16,12 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _appVersion = '';
-  bool _engineReady = false;
 
   @override
   void initState() {
     super.initState();
     PackageInfo.fromPlatform().then((info) {
       if (mounted) setState(() => _appVersion = info.version);
-    });
-    setState(() {
-      _engineReady = BinaryManager.instance.isReady;
     });
   }
 
@@ -104,12 +100,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _SettingsTile(
             icon: Icons.settings_applications_outlined,
             title: 'yt-dlp (bundled)',
-            subtitle: _engineReady
+            subtitle: BinaryManager.instance.isReady
                 ? 'Binary ready — runs fully on-device'
                 : 'Binary not yet extracted',
             trailing: Icon(
-              _engineReady ? Icons.check_circle : Icons.hourglass_empty,
-              color: _engineReady ? AppColors.success : AppColors.warning,
+              BinaryManager.instance.isReady
+                  ? Icons.check_circle
+                  : Icons.hourglass_empty,
+              color: BinaryManager.instance.isReady
+                  ? AppColors.success
+                  : AppColors.warning,
             ),
           ),
 

@@ -297,10 +297,15 @@ class LocalDownloadManager {
     }
 
     if (!hasFfmpeg) {
-      // Without ffmpeg, select a pre-muxed stream only.
-      final heightSuffix =
-          quality != 'best' ? '[height<=$quality]' : '';
-      return 'best$heightSuffix[ext=mp4]/best$heightSuffix[vcodec!=none][acodec!=none]/best$heightSuffix/best';
+      // Without ffmpeg we must select a pre-muxed (combined video+audio) stream.
+      if (quality == 'best') {
+        return 'best[ext=mp4][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]/best';
+      }
+      // Height-constrained pre-muxed stream.
+      return 'best[height<=$quality][ext=mp4][vcodec!=none][acodec!=none]'
+          '/best[height<=$quality][vcodec!=none][acodec!=none]'
+          '/best[height<=$quality]'
+          '/best';
     }
 
     // With ffmpeg, prefer separate best-quality streams and merge them.
