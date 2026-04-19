@@ -47,6 +47,12 @@ download_ytdlp "armeabi-v7a" "yt-dlp_linux_armv7l"
 download_ytdlp "x86_64"      "yt-dlp_linux_x86_64"
 
 # ── ffmpeg ────────────────────────────────────────────────────────────────────
+# Set SKIP_FFMPEG=1 to skip ffmpeg and keep APK smaller.
+if [ "${SKIP_FFMPEG:-0}" = "1" ]; then
+  echo "==> Skipping ffmpeg download (SKIP_FFMPEG=1)"
+  exit 0
+fi
+
 # John Van Sickle's static ARM builds are widely used for Android/Termux.
 # We pull the "arm64" and "armhf" variants, which map to arm64-v8a and armeabi-v7a.
 # For x86_64 we use the amd64 static build.

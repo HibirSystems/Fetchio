@@ -1,6 +1,7 @@
 import 'dart:ffi' show Abi;
 import 'dart:io';
 
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:path_provider/path_provider.dart';
 
 /// Manages lifecycle of yt-dlp binaries downloaded after app installation.
@@ -8,12 +9,11 @@ class BinaryManager {
   BinaryManager._();
 
   static final BinaryManager instance = BinaryManager._();
+  static const MethodChannel _runtimeChannel =
+      MethodChannel('com.hibir.fetchio/runtime');
 
   static const String _engineMissingMessage =
-      'yt-dlp engine is not installed. Open Settings > Engine and tap "Download Engine".';
-  static const String _engineNotExecutableMessage =
-      'yt-dlp was downloaded but cannot be executed on this device. '
-      'This Android build may block executable files in app storage.';
+      'yt-dlp engine is not available on this device. Please reinstall the app.';
 
   String? _ytDlpPath;
   String? _ffmpegPath;
@@ -42,7 +42,7 @@ class BinaryManager {
     }
   }
 
-  /// Installs or updates yt-dlp for the current ABI.
+  /// Updates yt-dlp to the latest version (optional; bundled engine is always available).
   Future<void> installOrUpdateYtDlp() async {
     final abi = _currentAbi();
     if (abi == null) {
@@ -85,7 +85,10 @@ class BinaryManager {
         }
       }
 
-      throw StateError(_engineNotExecutableMessage);
+      throw Exception(
+        'Downloaded yt-dlp could not be executed on this device. '
+        'Using bundled engine instead (bundled version will be used automatically).',
+      );
     } finally {
       client.close(force: true);
       if (await downloadedFile.exists()) {
@@ -116,6 +119,7 @@ class BinaryManager {
   }
 
   /// Re-evaluates whether yt-dlp is installed and executable.
+  /// Prioritizes bundled native-library engine for maximum reliability across devices.
   Future<bool> refreshStatus() async {
     final abi = _currentAbi();
     if (abi == null) {
@@ -125,6 +129,16 @@ class BinaryManager {
       return false;
     }
 
+    // Try bundled native-library engine first (most reliable on restricted devices)
+    final bundled = await _resolveBundledAndroidBinary('libfetchio_ytdlp.so');
+    if (bundled != null && await _isRunnable(File(bundled))) {
+      _ytDlpPath = bundled;
+      _ffmpegPath = await _resolveBundledAndroidBinary('libfetchio_ffmpeg.so');
+      _ready = true;
+      return true;
+    }
+
+    // Fall back to user-downloaded engine if available
     for (final file in await _candidateBinaryFiles(abi)) {
       if (await _isRunnable(file)) {
         _ytDlpPath = file.path;
@@ -197,6 +211,21 @@ class BinaryManager {
       return false;
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<String?> _resolveBundledAndroidBinary(String filename) async {
+    try {
+      final nativeLibDir =
+          await _runtimeChannel.invokeMethod<String>('getNativeLibraryDir');
+      if (nativeLibDir == null || nativeLibDir.isEmpty) return null;
+
+      final file = File('$nativeLibDir/$filename');
+      if (!await file.exists()) return null;
+      if (await file.length() == 0) return null;
+      return file.path;
+    } catch (_) {
+      return null;
     }
   }
 

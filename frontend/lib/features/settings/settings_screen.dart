@@ -170,26 +170,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             icon: Icons.settings_applications_outlined,
             title: 'yt-dlp Engine',
             subtitle: _engineInstalled
-                ? 'Installed locally (tap to update)'
-                : 'Not installed. Required for search and downloads.',
+                ? 'Available • Tap to download latest version'
+                : 'Available (bundled) • Optional update available',
             trailing: _engineBusy
                 ? const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Icon(
-                    _engineInstalled ? Icons.check_circle : Icons.download,
-                    color: _engineInstalled
-                        ? AppColors.success
-                        : AppColors.warning,
+                : const Icon(
+                    Icons.check_circle,
+                    color: AppColors.success,
                   ),
             onTap: _engineBusy ? null : _downloadOrUpdateEngine,
           ),
           _SettingsTile(
             icon: Icons.delete_outline,
-            title: 'Remove Engine',
-            subtitle: 'Delete local yt-dlp binary to free up storage',
+            title: 'Remove Downloaded Version',
+            subtitle:
+                'Delete downloaded yt-dlp to free up storage (bundled remains)',
             trailing: Icon(
               Icons.chevron_right,
               color:

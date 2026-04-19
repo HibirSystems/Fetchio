@@ -50,6 +50,10 @@ jobs:
         working-directory: frontend
         run: flutter pub get
 
+      - name: Download compatibility yt-dlp binary
+        working-directory: frontend
+        run: SKIP_FFMPEG=1 bash scripts/download_binaries.sh
+
       - name: Decode keystore
         if: ${{ env.KEYSTORE_BASE64 != '' }}
         working-directory: frontend/android/app
@@ -119,7 +123,8 @@ jobs:
 
             ### What's new
             - **Smaller APKs** with per-ABI release outputs.
-            - yt-dlp engine is now downloaded from **Settings** after app install.
+            - Includes a built-in compatibility yt-dlp engine for devices that block executing downloaded binaries.
+            - yt-dlp can still be updated from **Settings** after install.
             - Downloads are saved to the device Downloads / Gallery automatically.
             - Supports Android 7.0 (API 24) and above.
 
@@ -129,7 +134,7 @@ jobs:
             3. Open the downloaded APK and tap **Install**
 
             ### Notes
-            - Open Settings and tap **Download Engine** once after installing.
+            - If your device blocks executable files in app storage, the bundled compatibility engine is used automatically.
             - Choose the APK matching your device ABI for the smallest download size.
           files: frontend/build/app/outputs/flutter-apk/fetchio-*.apk
           draft: false

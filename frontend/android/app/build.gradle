@@ -77,6 +77,14 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+        }
+        doNotStrip "lib/*/libfetchio_ytdlp.so"
+        doNotStrip "lib/*/libfetchio_ffmpeg.so"
+    }
 }
 
 flutter {
