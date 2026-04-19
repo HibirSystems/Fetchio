@@ -77,7 +77,7 @@ class BinaryManager {
         return 'armeabi-v7a';
       case Abi.androidX64:
         return 'x86_64';
-      case Abi.androidX86:
+      case Abi.androidIA32:
         // 32-bit x86 devices are rare; fall back to armeabi-v7a via houdini.
         return 'armeabi-v7a';
       default:
