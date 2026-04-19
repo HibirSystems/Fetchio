@@ -3,20 +3,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'core/engine/binary_manager.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
-import 'core/constants/app_constants.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Force portrait orientation on phones
+  // Force portrait orientation on phones.
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // System UI overlay
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -25,8 +24,12 @@ void main() async {
     ),
   );
 
-  // Initialize Hive
+  // Initialize Hive.
   await Hive.initFlutter();
+
+  // Extract bundled yt-dlp + ffmpeg binaries from assets to the private
+  // app storage directory so they can be executed.
+  await BinaryManager.instance.ensureReady();
 
   runApp(const ProviderScope(child: FetchioApp()));
 }

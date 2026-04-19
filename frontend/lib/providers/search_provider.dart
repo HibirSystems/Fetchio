@@ -1,37 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
 
-import '../core/network/dio_client.dart';
+import '../core/engine/local_media_repository.dart';
 import '../shared/models/search_result.dart';
 
-// ── Repository ────────────────────────────────────────────────────────────────
+// ── Repository provider ───────────────────────────────────────────────────────
 
-class SearchRepository {
-  const SearchRepository(this._dio);
-  final Dio _dio;
-
-  Future<SearchResponse> search({
-    required String query,
-    int page = 1,
-    int perPage = 20,
-    String? mediaType,
-  }) async {
-    final params = <String, dynamic>{
-      'q': query,
-      'page': page,
-      'per_page': perPage,
-      if (mediaType != null) 'media_type': mediaType,
-    };
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/search',
-      queryParameters: params,
-    );
-    return SearchResponse.fromJson(response.data!);
-  }
-}
-
-final searchRepositoryProvider = Provider<SearchRepository>((ref) {
-  return SearchRepository(ref.watch(dioProvider));
+final searchRepositoryProvider = Provider<LocalSearchRepository>((ref) {
+  return const LocalSearchRepository();
 });
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -79,25 +54,21 @@ class SearchState {
 class SearchNotifier extends StateNotifier<SearchState> {
   SearchNotifier(this._repo) : super(const SearchState());
 
-  final SearchRepository _repo;
+  final LocalSearchRepository _repo;
   static const int _perPage = 20;
 
   Future<void> search(String query) async {
     if (query.trim().isEmpty) return;
     state = SearchState(query: query, isLoading: true);
     try {
-      final response = await _repo.search(query: query, page: 1, perPage: _perPage);
+      final response =
+          await _repo.search(query: query, page: 1, perPage: _perPage);
       state = state.copyWith(
         results: response.results,
         isLoading: false,
         page: 1,
         total: response.total,
         hasMore: response.results.length == _perPage,
-      );
-    } on DioException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.message ?? 'Network error',
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());

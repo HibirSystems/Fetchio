@@ -51,10 +51,23 @@ android {
 
     defaultConfig {
         applicationId "com.hibir.fetchio"
-        minSdkVersion flutter.minSdkVersion
+        // Raised to 24 to guarantee a compatible Linux kernel ABI for the
+        // bundled yt-dlp and ffmpeg static binaries (Android 7.0+).
+        minSdkVersion 24
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+    }
+
+    // Build per-ABI APKs so each variant only bundles the relevant binary,
+    // keeping the download size manageable.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+            universalApk true // also produce a fat APK for convenience
+        }
     }
 
     signingConfigs {

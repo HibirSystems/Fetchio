@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../core/engine/binary_manager.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/settings_provider.dart';
 
@@ -94,13 +95,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const SizedBox(height: 16),
 
-          // ── API ───────────────────────────────────────────────────────────
-          _SectionHeader(title: 'API Configuration'),
+          // ── Engine ────────────────────────────────────────────────────────
+          _SectionHeader(title: 'Engine'),
           _SettingsTile(
-            icon: Icons.api_outlined,
-            title: 'API Base URL',
-            subtitle: settings.apiBaseUrl,
-            onTap: () => _showApiUrlDialog(context, settings, notifier),
+            icon: Icons.settings_applications_outlined,
+            title: 'yt-dlp (bundled)',
+            subtitle: BinaryManager.instance.isReady
+                ? 'Binary ready — runs fully on-device'
+                : 'Binary not yet extracted',
+            trailing: Icon(
+              BinaryManager.instance.isReady
+                  ? Icons.check_circle
+                  : Icons.hourglass_empty,
+              color: BinaryManager.instance.isReady
+                  ? AppColors.success
+                  : AppColors.warning,
+            ),
           ),
 
           const SizedBox(height: 16),
@@ -115,7 +125,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _SettingsTile(
             icon: Icons.code_outlined,
             title: 'Powered by yt-dlp',
-            subtitle: 'Open-source media extraction engine',
+            subtitle: 'Open-source media extraction engine — 1000+ sites',
           ),
         ],
       ),
@@ -147,14 +157,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Preferred Quality', style: AppTextStyles.headlineMedium),
+              const Text('Preferred Quality',
+                  style: AppTextStyles.headlineMedium),
               const SizedBox(height: 16),
               ...options.map(
                 (opt) => RadioListTile<String>(
                   value: opt.$1,
                   groupValue: settings.preferredQuality,
                   title: Text(opt.$2,
-                      style: const TextStyle(color: AppColors.textPrimary)),
+                      style:
+                          const TextStyle(color: AppColors.textPrimary)),
                   activeColor: AppColors.primary,
                   onChanged: (v) {
                     if (v != null) {
@@ -168,41 +180,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       },
-    );
-  }
-
-  void _showApiUrlDialog(
-    BuildContext context,
-    AppSettings settings,
-    SettingsNotifier notifier,
-  ) {
-    final ctrl = TextEditingController(text: settings.apiBaseUrl);
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.darkCard,
-        title: const Text('API Base URL', style: AppTextStyles.titleMedium),
-        content: TextField(
-          controller: ctrl,
-          style: const TextStyle(color: AppColors.textPrimary),
-          decoration: const InputDecoration(
-            hintText: 'http://your-server:8000/api/v1',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              notifier.setApiBaseUrl(ctrl.text.trim());
-              Navigator.of(context).pop();
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -17,9 +17,8 @@ dependencies:
   # Navigation
   go_router: ^13.2.0
 
-  # Networking
-  dio: ^5.4.3+1
-  web_socket_channel: ^2.4.5
+  # Unique IDs for local download items
+  uuid: ^4.4.0
 
   # Local storage
   hive_flutter: ^1.1.0
@@ -61,3 +60,7 @@ flutter:
     - assets/images/
     - assets/animations/
     - assets/icons/
+    # yt-dlp + ffmpeg binaries (downloaded by scripts/download_binaries.sh before build)
+    - assets/binaries/arm64-v8a/
+    - assets/binaries/armeabi-v7a/
+    - assets/binaries/x86_64/
