@@ -21,7 +21,7 @@ class _DownloadOptionsModalState extends State<DownloadOptionsModal> {
   String _mode = 'video'; // 'video' | 'audio'
   String? _selectedFormatId;
   String _audioFormat = 'mp3';
-  String _quality = 'best';
+  final String _quality = 'best';
   bool _embedThumbnail = true;
 
   // Sensible video quality options derived from available formats
@@ -32,7 +32,7 @@ class _DownloadOptionsModalState extends State<DownloadOptionsModal> {
     for (final f in widget.mediaInfo.formats) {
       if (f.vcodec == null || f.vcodec == 'none') continue;
       final res = f.resolution ?? f.formatNote ?? f.formatId;
-      if (res == null || seen.contains(res)) continue;
+      if (seen.contains(res)) continue;
       seen.add(res);
       opts.add(_QualityOption(label: res, formatId: f.formatId));
     }
@@ -161,7 +161,7 @@ class _DownloadOptionsModalState extends State<DownloadOptionsModal> {
               Switch(
                 value: _embedThumbnail,
                 onChanged: (v) => setState(() => _embedThumbnail = v),
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
               ),
             ],
           ),

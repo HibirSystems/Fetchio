@@ -14,6 +14,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JNILIBS_DIR="$SCRIPT_DIR/../android/app/src/main/jniLibs"
+ASSET_BIN_DIR="$SCRIPT_DIR/../assets/binaries"
 
 # ── yt-dlp ────────────────────────────────────────────────────────────────────
 
@@ -31,11 +32,14 @@ echo "==> Downloading yt-dlp ${YTDLP_VERSION}"
 download_ytdlp() {
   local abi="$1"
   local upstream_name="$2"
-  local dest="${JNILIBS_DIR}/${abi}/libfetchio_ytdlp.so"
+  local so_dest="${JNILIBS_DIR}/${abi}/libfetchio_ytdlp.so"
+  local asset_dest="${ASSET_BIN_DIR}/${abi}/yt-dlp"
   mkdir -p "${JNILIBS_DIR}/${abi}"
+  mkdir -p "${ASSET_BIN_DIR}/${abi}"
   echo "    [yt-dlp] ${abi} <- ${upstream_name}"
-  curl -L --retry 3 -o "${dest}" "${YTDLP_BASE}/${upstream_name}"
-  chmod 755 "${dest}"
+  curl -L --retry 3 -o "${so_dest}" "${YTDLP_BASE}/${upstream_name}"
+  cp "${so_dest}" "${asset_dest}"
+  chmod 755 "${so_dest}" "${asset_dest}"
 }
 
 download_ytdlp "arm64-v8a"   "yt-dlp_linux_aarch64"
@@ -55,15 +59,20 @@ download_ffmpeg() {
   local abi="$1"
   local archive_name="$2"
   local inner_binary="$3"   # path inside the tar.xz
-  local dest="${JNILIBS_DIR}/${abi}/libfetchio_ffmpeg.so"
+  local so_dest="${JNILIBS_DIR}/${abi}/libfetchio_ffmpeg.so"
+  local asset_dest="${ASSET_BIN_DIR}/${abi}/ffmpeg"
   local tmp_dir
   tmp_dir="$(mktemp -d)"
+
+  mkdir -p "${JNILIBS_DIR}/${abi}"
+  mkdir -p "${ASSET_BIN_DIR}/${abi}"
 
   echo "    [ffmpeg] ${abi} <- ${archive_name}"
   curl -L --retry 3 -o "${tmp_dir}/ffmpeg.tar.xz" "${FFMPEG_BASE}/${archive_name}"
   tar -xJf "${tmp_dir}/ffmpeg.tar.xz" -C "${tmp_dir}" --strip-components=1 --wildcards "*/${inner_binary}"
-  mv "${tmp_dir}/${inner_binary}" "${dest}"
-  chmod 755 "${dest}"
+  mv "${tmp_dir}/${inner_binary}" "${so_dest}"
+  cp "${so_dest}" "${asset_dest}"
+  chmod 755 "${so_dest}" "${asset_dest}"
   rm -rf "${tmp_dir}"
 }
 

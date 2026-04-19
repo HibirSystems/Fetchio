@@ -138,7 +138,7 @@ class AppTheme {
         color: AppColors.primary,
         linearTrackColor: AppColors.darkCard,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.darkCard,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

@@ -43,7 +43,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           // ── Appearance ────────────────────────────────────────────────────
-          _SectionHeader(title: 'Appearance'),
+          const _SectionHeader(title: 'Appearance'),
           _SettingsTile(
             icon: Icons.dark_mode_outlined,
             title: 'Theme',
@@ -52,14 +52,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               value: settings.themeMode == 'dark',
               onChanged: (v) =>
                   notifier.setThemeMode(v ? 'dark' : 'light'),
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
             ),
           ),
 
           const SizedBox(height: 16),
 
           // ── Downloads ─────────────────────────────────────────────────────
-          _SectionHeader(title: 'Downloads'),
+          const _SectionHeader(title: 'Downloads'),
           _SettingsTile(
             icon: Icons.audiotrack_outlined,
             title: 'Audio Only',
@@ -67,7 +67,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             trailing: Switch(
               value: settings.audioOnly,
               onChanged: notifier.setAudioOnly,
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
             ),
           ),
           _SettingsTile(
@@ -89,14 +89,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             trailing: Switch(
               value: settings.embedThumbnail,
               onChanged: notifier.setEmbedThumbnail,
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
             ),
           ),
 
           const SizedBox(height: 16),
 
           // ── Engine ────────────────────────────────────────────────────────
-          _SectionHeader(title: 'Engine'),
+          const _SectionHeader(title: 'Engine'),
           _SettingsTile(
             icon: Icons.settings_applications_outlined,
             title: 'yt-dlp (bundled)',
@@ -116,13 +116,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 16),
 
           // ── About ─────────────────────────────────────────────────────────
-          _SectionHeader(title: 'About'),
+          const _SectionHeader(title: 'About'),
           _SettingsTile(
             icon: Icons.info_outline,
             title: 'Version',
             subtitle: _appVersion.isNotEmpty ? _appVersion : '1.0.0',
           ),
-          _SettingsTile(
+          const _SettingsTile(
             icon: Icons.code_outlined,
             title: 'Powered by yt-dlp',
             subtitle: 'Open-source media extraction engine — 1000+ sites',

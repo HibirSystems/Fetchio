@@ -5,9 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/settings_provider.dart';
-import '../../providers/search_provider.dart';
 import '../../shared/widgets/search_bar_widget.dart';
-import '../../shared/widgets/media_card.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});

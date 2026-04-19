@@ -69,7 +69,7 @@ class _DownloadManagerScreenState
           tabs: [
             Tab(text: 'Active${active.isNotEmpty ? ' (${active.length})' : ''}'),
             Tab(text: 'Completed${completed.isNotEmpty ? ' (${completed.length})' : ''}'),
-            Tab(text: 'History'),
+            const Tab(text: 'History'),
           ],
         ),
       ),
