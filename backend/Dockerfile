@@ -1,4 +1,8 @@
-FROM python:3.12-slim
+FROM node:22.14.0-bookworm-slim AS javascript-runtime
+
+FROM python:3.12-slim-bookworm
+
+COPY --from=javascript-runtime /usr/local/bin/node /usr/local/bin/node
 
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
