@@ -144,6 +144,8 @@ yt-dlp supports **1000+** platforms out of the box, including:
 
 ## Troubleshooting media info and thumbnails
 
+Downloads preserve the URL originally opened or pasted in the app. Metadata stream links (such as signed `googlevideo.com/videoplayback` URLs) are not reused as the download source. After deploying this fix, rebuild/install the Android APK as well as restarting the backend. For failed history entries created by older versions with a stream URL, open the original video page and start a **new** download; retrying an old entry retains its saved request.
+
 Flat search entries can return a `thumbnails` list instead of a single image URL. The backend normalizes that list for Android clients; deploy/restart the backend to clear cached search responses after updating.
 
 YouTube extraction needs both the pinned `yt-dlp-ejs` Python dependency (included in `backend/requirements.txt`) and a supported JavaScript runtime. The Docker image includes Node.js 22.14.0 and explicitly enables it in yt-dlp. For non-Docker deployments, install Node.js >=22 on the backend's PATH. These are backend dependencies; rebuilding the APK alone does not install them.
@@ -151,6 +153,8 @@ YouTube extraction needs both the pinned `yt-dlp-ejs` Python dependency (include
 If metadata fails with **sign-in/bot verification required**, search may still work because flat search does not fetch downloadable formats. The API now returns an actionable explanation instead of `RetryError[<Future ...>]`. Server IP restrictions, login requirements and unavailable media are not fixed by a new APK or by a JavaScript runtime alone.
 
 For media you are authorized to access, the backend operator may configure a Netscape-format cookies file with `YTDLP_COOKIES_FILE`. Keep it private, readable only by the service user, and outside the repository, APK, Docker image and logs. With Docker Compose, mount the file read-only (for example, `/secure/path/cookies.txt:/run/secrets/ytdlp-cookies.txt:ro`) and add `YTDLP_COOKIES_FILE=/run/secrets/ytdlp-cookies.txt` to the API service environment. Restart the backend after configuration changes. Never send cookies or credentials in chat or paste them into the Android app. Account verification can still be required by the site; cookies do not guarantee access.
+
+A Vimeo `Failed to fetch macos OAuth token: HTTP Error 401` is separate from the stream-URL bug: Vimeo rejected the extractor authentication request. The supported web client can require login. Authorized Vimeo cookies may be necessary, but are not a guaranteed fix; this is not resolved by forcing an anonymous client.
 
 Rebuild the backend image with `docker compose up -d --build api`, or reinstall `backend/requirements.txt` and restart the server for a local deployment. See [yt-dlp JavaScript support](https://github.com/yt-dlp/yt-dlp/wiki/EJS) and [official cookies guidance](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp).
 

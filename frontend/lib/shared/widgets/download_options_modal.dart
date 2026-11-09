@@ -8,9 +8,11 @@ class DownloadOptionsModal extends StatefulWidget {
     super.key,
     required this.mediaInfo,
     required this.onDownload,
+    this.sourceUrl,
   });
 
   final MediaInfo mediaInfo;
+  final String? sourceUrl;
   final void Function(Map<String, dynamic> request) onDownload;
 
   @override
@@ -45,9 +47,14 @@ class _DownloadOptionsModalState extends State<DownloadOptionsModal> {
 
   void _startDownload() {
     final req = <String, dynamic>{
-      'url': widget.mediaInfo.url.isNotEmpty
-          ? widget.mediaInfo.url
-          : widget.mediaInfo.webpageUrl ?? widget.mediaInfo.url,
+      'url': [
+        widget.sourceUrl,
+        widget.mediaInfo.webpageUrl,
+        widget.mediaInfo.url
+      ]
+          .whereType<String>()
+          .map((url) => url.trim())
+          .firstWhere((url) => url.isNotEmpty, orElse: () => ''),
       'audio_only': _mode == 'audio',
       if (_mode == 'audio') 'convert_to': _audioFormat,
       if (_mode == 'video' && _selectedFormatId != null)
