@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/download_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../shared/widgets/search_bar_widget.dart';
+import '../../shared/models/download_item.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -47,8 +48,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.only(left: 20, right: 20, top: 60, bottom: 16),
+                  padding: const EdgeInsets.only(
+                      left: 20, right: 20, top: 60, bottom: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -203,7 +204,8 @@ class _QuickPasteCardState extends ConsumerState<_QuickPasteCard> {
                 child: TextField(
                   controller: _ctrl,
                   focusNode: _focus,
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                  style: const TextStyle(
+                      color: AppColors.textPrimary, fontSize: 14),
                   decoration: const InputDecoration(
                     hintText: 'https://...',
                     isDense: true,
@@ -217,7 +219,8 @@ class _QuickPasteCardState extends ConsumerState<_QuickPasteCard> {
               ElevatedButton(
                 onPressed: _go,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   minimumSize: Size.zero,
                 ),
                 child: const Icon(Icons.arrow_forward_rounded, size: 20),
@@ -236,7 +239,8 @@ class _SearchHistorySection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(searchHistoryProvider);
-    if (history.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    if (history.isEmpty)
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
 
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -247,13 +251,15 @@ class _SearchHistorySection extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Recent Searches', style: AppTextStyles.headlineMedium),
+                const Text('Recent Searches',
+                    style: AppTextStyles.headlineMedium),
                 TextButton(
                   onPressed: () =>
                       ref.read(searchHistoryProvider.notifier).clear(),
                   child: const Text(
                     'Clear',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    style:
+                        TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   ),
                 ),
               ],
@@ -285,7 +291,7 @@ class _SearchHistorySection extends ConsumerWidget {
 class DownloadTileCompact extends StatelessWidget {
   const DownloadTileCompact({super.key, required this.item});
 
-  final dynamic item; // DownloadItem
+  final DownloadItem item;
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +327,8 @@ class DownloadTileCompact extends StatelessWidget {
                 color: AppColors.darkDivider,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.download, size: 20, color: AppColors.textHint),
+              child: const Icon(Icons.download,
+                  size: 20, color: AppColors.textHint),
             ),
           const SizedBox(width: 12),
           Expanded(
