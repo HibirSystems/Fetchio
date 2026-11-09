@@ -7,6 +7,7 @@ import '../../shared/models/media_info.dart';
 import '../../shared/models/search_result.dart';
 
 class BackendApiClient {
+  static const requestTimeout = Duration(seconds: 30);
   BackendApiClient({required String baseUrl, http.Client? client})
       : _client = client ?? http.Client(),
         baseUri = _normalizeBaseUrl(baseUrl);
@@ -70,7 +71,7 @@ class BackendApiClient {
     Map<String, String?>? queryParameters,
   ]) async {
     final uri = _resolve(path, queryParameters);
-    final response = await _client.get(uri);
+    final response = await _client.get(uri).timeout(requestTimeout);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       _throwHttpError(response, uri);
     }
@@ -82,11 +83,13 @@ class BackendApiClient {
     Map<String, dynamic> body,
   ) async {
     final uri = _resolve(path);
-    final response = await _client.post(
-      uri,
-      headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
+    final response = await _client
+        .post(
+          uri,
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(requestTimeout);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       _throwHttpError(response, uri);
     }
@@ -139,7 +142,7 @@ class BackendApiClient {
 
   Future<DownloadItem?> getDownload(String downloadId) async {
     final uri = _resolve('downloads/$downloadId');
-    final response = await _client.get(uri);
+    final response = await _client.get(uri).timeout(requestTimeout);
     if (response.statusCode == 404) return null;
     if (response.statusCode < 200 || response.statusCode >= 300) {
       _throwHttpError(response, uri);
@@ -149,7 +152,7 @@ class BackendApiClient {
 
   Future<bool> cancelDownload(String downloadId) async {
     final uri = _resolve('downloads/$downloadId');
-    final response = await _client.delete(uri);
+    final response = await _client.delete(uri).timeout(requestTimeout);
     if (response.statusCode == 404) return false;
     if (response.statusCode < 200 || response.statusCode >= 300) {
       _throwHttpError(response, uri);
@@ -157,9 +160,18 @@ class BackendApiClient {
     return true;
   }
 
+  Future<DownloadItem> retryDownload(String downloadId) async {
+    final json = await _postJson(
+        'downloads/${Uri.encodeComponent(downloadId)}/retry', {});
+    return DownloadItem.fromJson(json);
+  }
+
+  Uri downloadFileUri(String downloadId) =>
+      _resolve('downloads/${Uri.encodeComponent(downloadId)}/file');
+
   Future<int> clearCompleted() async {
     final uri = _resolve('downloads');
-    final response = await _client.delete(uri);
+    final response = await _client.delete(uri).timeout(requestTimeout);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       _throwHttpError(response, uri);
     }
