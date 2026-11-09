@@ -1,6 +1,6 @@
 # Fetchio
 
-A **production-grade cross-platform media downloader** built with Flutter (frontend) and FastAPI + yt-dlp (backend).
+A **self-hosted cross-platform media downloader** built with Flutter (frontend) and FastAPI + yt-dlp (backend).
 
 ---
 
@@ -48,6 +48,8 @@ Fetchio/
 | `POST` | `/api/v1/downloads` | Queue a new download |
 | `GET` | `/api/v1/downloads` | List all downloads |
 | `GET` | `/api/v1/downloads/{id}` | Get single download progress |
+| `GET` | `/api/v1/downloads/{id}/file` | Save a completed file to this device |
+| `POST` | `/api/v1/downloads/{id}/retry` | Retry a failed or cancelled download |
 | `DELETE` | `/api/v1/downloads/{id}` | Cancel active download |
 | `DELETE` | `/api/v1/downloads` | Clear completed downloads |
 | `WS` | `/api/v1/downloads/{id}/ws` | Real-time progress stream |
@@ -129,55 +131,90 @@ yt-dlp supports **1000+** platforms out of the box, including:
 
 ---
 
-## Production deployment
+## Download reliability
 
-1. Set a strong `SECRET_KEY` in `.env`
-2. Configure `ALLOWED_ORIGINS` to your domain
-3. Mount a persistent volume for `DOWNLOAD_DIR`
-4. Put an Nginx reverse proxy in front of the API
-5. Use `docker-compose up -d --build`
+- Quality preferences and custom yt-dlp format selectors are accepted by the API.
+- Completed files can be saved from the Downloads screen. Downloads run on the backend, not directly on the phone/browser.
+- Failed and cancelled downloads can be retried with their original options.
+- History and original requests persist as atomic `.download.json` records in each download directory. On restart, interrupted jobs become failed entries that can be retried; jobs are not automatically resumed.
+- Cancellation cooperatively stops yt-dlp at its next progress hook. Metadata extraction and FFmpeg processing may finish before the worker exits; its concurrency slot stays occupied until then.
+- Clearing finished history leaves media files on disk. Storage cleanup remains an operator responsibility.
+- The client retains its last known list during connection errors and polls for recovery every three seconds.
+
+## Integrated web preview
+
+Prerequisites: Python 3.12, FFmpeg, and Flutter on `PATH` (verified with Flutter 3.24.5). The scripts also recognize a local SDK at `.tools/flutter`; they do not install an SDK.
+
+```bash
+bash .hoplite/setup.sh
+bash .hoplite/run.sh
+```
+
+The web build and API are served together on port 3000. Browser clients default to the same-origin `/api/v1`, so HTTPS previews do not call an unreachable localhost backend. Native Android defaults to the emulator host address. For a separate backend, configure Settings or compile with `--dart-define=API_BASE_URL=https://your-api.example/api/v1`.
+
+For a prebuilt web deployment, set `FRONTEND_DIR` to the Flutter `build/web` directory when starting the API. Without it the API remains standalone.
+
+## Deployment boundaries
+
+Use **one API worker**: the active queue, semaphore and progress stream are process-local. Docker is configured accordingly; multiple workers/replicas need shared job coordination before use. Mount a persistent `DOWNLOAD_DIR` to retain files and history.
+
+This is a trusted-user/self-hosted service, **not an authenticated public download service**. `SECRET_KEY`, API-key and rate-limit settings do not currently enforce access control. Before exposing it publicly, add authentication and rate limiting at a reverse proxy, restrict allowed origins, restrict outbound network access (including private/internal destinations), and set storage quotas. HTTP(S) URL validation alone does not prevent SSRF. Only download media you own or are permitted to download; availability depends on upstream sites, access permissions and yt-dlp support.
+
+## Verification
+
+```bash
+.venv/bin/pip install -r backend/requirements-dev.txt
+PYTHONPATH=backend .venv/bin/python -m pytest backend/tests -q
+cd frontend
+flutter test
+flutter analyze
+flutter build web --release --web-renderer canvaskit --no-web-resources-cdn
+```
+
+Implementation references: [yt-dlp embedding and output paths (2026.02.21)](https://github.com/yt-dlp/yt-dlp/tree/2026.02.21#embedding-yt-dlp), [Flutter network loading/error states](https://docs.flutter.dev/cookbook/networking/fetch-data).
 
 ---
 
-## Releasing a Production APK
+## Building an Android release APK (manual only)
 
-The CI workflow in `.github/workflows/release-apk.yml` automatically builds and publishes a signed APK to GitHub Releases whenever you push a version tag.
+The **Build Android Release APK** workflow in `.github/workflows/release-apk.yml` runs **only** through GitHub's **Run workflow** button. Commits, pull requests and pushed tags do not trigger it. It builds Android APKs only—no web, iOS or app bundle builds—and does not automatically publish a GitHub Release.
 
-### One-time setup (GitHub repository secrets)
+### One-time repository secrets
 
-Go to **Settings → Secrets and variables → Actions** and add:
+In **Settings → Secrets and variables → Actions**, configure:
 
 | Secret | Description |
 |--------|-------------|
-| `KEYSTORE_BASE64` | Base64-encoded `.jks` keystore (`base64 -w0 release.jks`) |
-| `KEY_ALIAS` | Signing key alias |
-| `KEY_PASSWORD` | Password for the signing key |
+| `KEYSTORE_BASE64` | Base64-encoded Android release `.jks` keystore |
+| `KEY_ALIAS` | Signing-key alias |
+| `KEY_PASSWORD` | Signing-key password |
 | `STORE_PASSWORD` | Keystore password |
-| `PRODUCTION_API_URL` | Production API base URL, e.g. `https://api.example.com/api/v1` |
+| `PRODUCTION_API_URL` | HTTPS backend URL ending in `/api/v1`; alternatively supply it when running the workflow |
 
-#### Generating a keystore (first time only)
+Use your existing release keystore for updates. To create one for a new app:
 
 ```bash
-keytool -genkeypair -v \
-  -keystore release.jks \
-  -keyalg RSA -keysize 2048 -validity 10000 \
-  -alias fetchio
-# then encode it:
+keytool -genkeypair -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias fetchio
 base64 -w0 release.jks
 ```
 
-Paste the output into the `KEYSTORE_BASE64` secret.
+Keep a secure backup of the keystore and passwords. Missing signing secrets fail the build; there is **no debug APK fallback**.
 
-### Trigger a release
+### Run and download
 
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+1. Ensure the workflow is on the repository's default branch so GitHub displays **Run workflow**.
+2. Open **Actions → Build Android Release APK → Run workflow**.
+3. Select the branch/tag, enter a version such as `1.0.0`, and optionally enter the backend URL. The backend must be reachable from the phone; the Android emulator's localhost address is not a production endpoint.
+4. After the run succeeds, download the `fetchio-<version>-android-release-<run>` artifact and extract it.
+5. Install **one** APK matching the device: `arm64-v8a` for most current phones, `armeabi-v7a` for older 32-bit phones, or `x86_64` for compatible emulators/devices. Android 7.0/API 24 or later is required.
 
-The workflow will build a release APK signed with your keystore, then publish it as a GitHub Release with the APK attached.
+### Size optimizations
 
-You can also trigger it manually from **Actions → Build & Release APK → Run workflow**.
+The build uses release/AOT mode, per-ABI APKs (no universal/fat APK), icon tree shaking, R8 code shrinking, Android resource shrinking and external Dart debug symbols. Symbols and the R8 mapping are uploaded separately, not bundled with installable APKs. Existing compressed native-library packaging is retained. Because the current app downloads through its backend, the workflow does **not** download or bundle the large unused yt-dlp/FFmpeg executables. A reachable backend is required.
+
+Exact APK sizes are measured in MiB in the run summary; they cannot be guaranteed before the first build. APK artifacts include SHA-256 checksums. Uploads expire after 30 days; symbol artifacts after 90 days, so archive symbols for releases you distribute. Each run uses its GitHub run number as the Android version code; use a new run (not a re-run) for a new app update.
+
+Build guidance: [Flutter Android deployment and ABI splitting](https://docs.flutter.dev/deployment/android), [AGP 8.6 / Gradle 8.7 / JDK 17 compatibility](https://developer.android.com/build/releases/past-releases/agp-8-6-0-release-notes).
 
 ---
 
