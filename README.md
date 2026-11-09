@@ -66,6 +66,7 @@ docker-compose up -d
 cd backend
 pip install -r requirements.txt
 # Install ffmpeg: https://ffmpeg.org/download.html
+# Install Node.js >=22 (Docker bundles Node 22.14.0): https://nodejs.org/en/download
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -140,6 +141,18 @@ yt-dlp supports **1000+** platforms out of the box, including:
 - Cancellation cooperatively stops yt-dlp at its next progress hook. Metadata extraction and FFmpeg processing may finish before the worker exits; its concurrency slot stays occupied until then.
 - Clearing finished history leaves media files on disk. Storage cleanup remains an operator responsibility.
 - The client retains its last known list during connection errors and polls for recovery every three seconds.
+
+## Troubleshooting media info and thumbnails
+
+Flat search entries can return a `thumbnails` list instead of a single image URL. The backend normalizes that list for Android clients; deploy/restart the backend to clear cached search responses after updating.
+
+YouTube extraction needs both the pinned `yt-dlp-ejs` Python dependency (included in `backend/requirements.txt`) and a supported JavaScript runtime. The Docker image includes Node.js 22.14.0 and explicitly enables it in yt-dlp. For non-Docker deployments, install Node.js >=22 on the backend's PATH. These are backend dependencies; rebuilding the APK alone does not install them.
+
+If metadata fails with **sign-in/bot verification required**, search may still work because flat search does not fetch downloadable formats. The API now returns an actionable explanation instead of `RetryError[<Future ...>]`. Server IP restrictions, login requirements and unavailable media are not fixed by a new APK or by a JavaScript runtime alone.
+
+For media you are authorized to access, the backend operator may configure a Netscape-format cookies file with `YTDLP_COOKIES_FILE`. Keep it private, readable only by the service user, and outside the repository, APK, Docker image and logs. With Docker Compose, mount the file read-only (for example, `/secure/path/cookies.txt:/run/secrets/ytdlp-cookies.txt:ro`) and add `YTDLP_COOKIES_FILE=/run/secrets/ytdlp-cookies.txt` to the API service environment. Restart the backend after configuration changes. Never send cookies or credentials in chat or paste them into the Android app. Account verification can still be required by the site; cookies do not guarantee access.
+
+Rebuild the backend image with `docker compose up -d --build api`, or reinstall `backend/requirements.txt` and restart the server for a local deployment. See [yt-dlp JavaScript support](https://github.com/yt-dlp/yt-dlp/wiki/EJS) and [official cookies guidance](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp).
 
 ## Integrated web preview
 
