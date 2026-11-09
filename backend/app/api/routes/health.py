@@ -17,11 +17,16 @@ async def health() -> dict[str, str]:
         ejs_version = version("yt-dlp-ejs")
     except PackageNotFoundError:
         ejs_version = "not-installed"
+    try:
+        transport_version = version("curl-cffi")
+    except PackageNotFoundError:
+        transport_version = "not-installed"
     return {
         "status": "ok",
         "app": settings.app_name,
         "version": settings.app_version,
         "extractor_version": version("yt-dlp"),
         "ejs_version": ejs_version,
+        "transport_version": transport_version,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

@@ -14,7 +14,7 @@ def extraction_error(error: Exception) -> MediaExtractionError:
         return MediaExtractionError(
             "YouTube requires sign-in verification from the backend server. "
             "The backend operator should check site access requirements and configure authorized cookies with "
-            "YTDLP_COOKIES_FILE. Rebuilding the Android app will not resolve this server-side restriction.",
+            "YTDLP_COOKIES_FILE (or YTDLP_COOKIES_BASE64 on Railway). Rebuilding the Android app will not resolve this server-side restriction.",
             "verification_required",
         )
     if "[vimeo]" in message and "oauth token" in message and "401" in message:
@@ -43,6 +43,16 @@ def extraction_error(error: Exception) -> MediaExtractionError:
             "For YouTube, the operator should check current yt-dlp JavaScript and PO-token requirements; "
             "repeated retries or a new APK alone will not resolve an access restriction.",
             "media_transfer_forbidden",
+        )
+    if "[tiktok]" in message and any(term in message for term in (
+        "unexpected response", "universal data", "rehydration", "challenge", "impersonation",
+    )):
+        return MediaExtractionError(
+            "TikTok did not return usable video data to the backend. "
+            "Check that transport_version in /api/v1/health reports an installed curl-cffi version, "
+            "then try the original public TikTok video link. If it still fails, "
+            "the backend operator should check TikTok access restrictions and yt-dlp logs.",
+            "tiktok_extraction_failed",
         )
     if "unsupported url" in message:
         return MediaExtractionError("This URL is not supported. Paste the original media page URL.", "unsupported_url")

@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import api_router
 from app.config import settings
+from app.core.cookie_session import configured_cookie_session
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -45,7 +46,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Starting %s v%s", settings.app_name, settings.app_version)
-    yield
+    with configured_cookie_session(settings):
+        yield
     logger.info("Shutting down %s", settings.app_name)
 
 

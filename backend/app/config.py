@@ -4,7 +4,7 @@ import os
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     # ── yt-dlp ────────────────────────────────────────────────────────────────
     ytdlp_proxy: str | None = None
     ytdlp_cookies_file: str | None = None
+    ytdlp_cookies_base64: SecretStr | None = None
     ytdlp_max_retries: int = 3
 
     # ── Rate limiting ─────────────────────────────────────────────────────────

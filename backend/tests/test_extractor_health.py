@@ -12,5 +12,6 @@ def test_health_reports_installed_extractor_versions_without_private_configurati
     data = response.json()
     assert data['extractor_version'] == version('yt-dlp')
     assert data['ejs_version'] == version('yt-dlp-ejs')
+    assert data['transport_version'] == version('curl-cffi')
     assert 'cookies' not in response.text.lower()
     assert 'proxy' not in response.text.lower()

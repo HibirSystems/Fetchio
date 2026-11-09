@@ -144,6 +144,22 @@ yt-dlp supports **1000+** platforms out of the box, including:
 
 ## Troubleshooting media info and thumbnails
 
+### TikTok transport support
+
+TikTok's current extractor requests browser-compatible networking. The backend includes `curl-cffi==0.17.0`, the version pinned by yt-dlp 2026.10.26, so its supported transport can be used. This is backend-only and does not increase APK size. `GET /api/v1/health` should report `transport_version: "0.17.0"`. A missing transport can produce `Unexpected response from webpage request`, even for a public short link. A transport update is not a guarantee for private, removed, regional or login-restricted content.
+
+### YouTube sessions on Railway
+
+A sign-in verification response is separate from TikTok's transport problem. For media you are authorized to access, Railway operators can now supply an authorized session without creating a persistent file manually:
+
+1. Export a **Netscape-format** cookies file for the intended site from a session you control, following [yt-dlp's official cookies guidance](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp). Do not send the file or its contents to chat.
+2. Base64-encode the file locally. Base64 is **not encryption**: treat the encoded value as a credential.
+3. In the Railway API service's private **runtime variables**, set `YTDLP_COOKIES_BASE64` to that value. Leave `YTDLP_COOKIES_FILE` unset. Do not put it in GitHub Actions inputs, APKs, source code, Docker build arguments, or logs.
+4. Redeploy the backend. Startup validates the file and writes it to a temporary service-only directory (0700) with file mode 0600. It is passed to yt-dlp and removed on graceful shutdown. Invalid or conflicting cookie sources fail startup without echoing the value. Updated cookies are temporary and do not overwrite the Railway variable.
+5. Test a new metadata request and download. Cookies may expire or be rejected for the backend's network; an authenticated session is **not a guaranteed fix**. Rotate/revoke sessions when no longer needed. Account use can carry restrictions or suspension risk.
+
+**Do not configure an operator account session on an unrestricted public API.** Protect the backend with access controls first: all users of a shared backend could otherwise request content available to that session. This configuration enables the operator to supply authorized access; it does not bypass YouTube verification or grant access to other accounts. This repository has no Railway-management integration, so runtime variables are not configured automatically.
+
 The backend pins yt-dlp **2026.10.26** with matching **yt-dlp-ejs 0.8.0**. Site extractors need coordinated, tested updates; the old February pin does not track later YouTube, Vimeo, Instagram or Facebook changes. Python 3.11+ is required by this extractor release (the image uses 3.12). The release APK remains Android-only and does not bundle these backend dependencies.
 
 Fractional durations returned by sites (for example Facebook's `67.596` seconds) are normalized to integer seconds (`67`) before API serialization; unknown/nonfinite durations are omitted. Search and media details use the same rule.

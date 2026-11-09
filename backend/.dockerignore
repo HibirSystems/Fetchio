@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+downloads/
+*.db
+*.db-*
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.venv/
+*cookie*.txt
+*.jks
+*.keystore
