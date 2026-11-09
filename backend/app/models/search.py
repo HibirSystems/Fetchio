@@ -4,7 +4,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_validator
+
+from app.models.normalization import normalize_duration
 
 
 class MediaType(str, Enum):
@@ -28,6 +30,11 @@ class SearchResultItem(BaseModel):
     description: str | None = None
 
     model_config = {"from_attributes": True}
+
+    @field_validator("duration", mode="before")
+    @classmethod
+    def normalize_duration_value(cls, value: Any) -> int | None:
+        return normalize_duration(value)
 
 
 class SearchResponse(BaseModel):

@@ -246,15 +246,29 @@ class YtDlpEngine:
         cancel_event: threading.Event | None = None,
     ) -> str:
         """Run yt-dlp in a thread pool and return the final postprocessed path."""
-        return await asyncio.to_thread(
-            self._download_sync,
-            url,
-            output_dir,
-            format_selector,
-            progress_hook,
-            extra_opts or {},
-            cancel_event,
-        )
+        for attempt in range(2):
+            if cancel_event is not None and cancel_event.is_set():
+                raise DownloadCancelled("Download cancelled")
+            try:
+                return await asyncio.to_thread(
+                    self._download_sync,
+                    url,
+                    output_dir,
+                    format_selector,
+                    progress_hook,
+                    extra_opts or {},
+                    cancel_event,
+                )
+            except DownloadError as exc:
+                message = str(exc).lower()
+                transfer_forbidden = "403" in message and any(
+                    term in message for term in ("video data", "fragment", "segment")
+                )
+                if attempt == 0 and transfer_forbidden:
+                    logger.info("Refreshing extraction once after a forbidden media transfer")
+                    continue
+                raise extraction_error(exc) from exc
+        raise RuntimeError("Download attempts exhausted")
 
     def _download_sync(
         self,
@@ -271,7 +285,8 @@ class YtDlpEngine:
             {
                 "format": format_selector,
                 "outtmpl": outtmpl,
-                "quiet": False,
+                "quiet": True,
+                "check_formats": "selected",
                 "progress_hooks": [progress_hook] if progress_hook else [],
                 "merge_output_format": "mp4",
                 "writethumbnail": False,

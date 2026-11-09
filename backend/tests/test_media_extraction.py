@@ -15,6 +15,7 @@ from app.services import media_service
 @pytest.mark.parametrize(('message', 'code', 'hint'), [
     ("Sign in to confirm you’re not a bot", 'verification_required', 'YTDLP_COOKIES_FILE'),
     ('[vimeo] 152738080: Failed to fetch macos OAuth token: HTTP Error 401: Unauthorized', 'upstream_authentication_failed', 'Vimeo rejected'),
+    ('[vimeo] The web client only works when logged-in', 'authentication_required', 'authorized cookies'),
     ('Private video. Sign in', 'authentication_required', 'authorized cookies'),
     ('No supported JavaScript runtime', 'javascript_challenge_failed', 'Node.js'),
     ('Unsupported URL: https://example.com', 'unsupported_url', 'original media page'),
