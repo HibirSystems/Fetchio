@@ -22,3 +22,9 @@ frontend/android/local.properties
 .DS_Store
 *.swp
 *.swo
+
+.venv/
+.tools/
+downloads/
+
+.hoplite/artifacts/

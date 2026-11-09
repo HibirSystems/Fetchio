@@ -2,10 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../providers/download_provider.dart';
 import '../../shared/models/download_item.dart';
+
+Future<void> _runAction(
+    BuildContext context, Future<void> Function() action) async {
+  try {
+    await action();
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Action failed: $error')),
+      );
+    }
+  }
+}
 
 class DownloadManagerScreen extends ConsumerStatefulWidget {
   const DownloadManagerScreen({super.key});
@@ -15,8 +29,7 @@ class DownloadManagerScreen extends ConsumerStatefulWidget {
       _DownloadManagerScreenState();
 }
 
-class _DownloadManagerScreenState
-    extends ConsumerState<DownloadManagerScreen>
+class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
 
@@ -38,8 +51,10 @@ class _DownloadManagerScreenState
   @override
   Widget build(BuildContext context) {
     final downloads = ref.watch(downloadProvider);
+    final sync = ref.watch(downloadSyncProvider);
     final active = downloads.where((d) => d.isActive).toList();
-    final completed = downloads.where((d) => d.status == DownloadStatus.completed).toList();
+    final completed =
+        downloads.where((d) => d.status == DownloadStatus.completed).toList();
     final history = downloads
         .where((d) =>
             d.status == DownloadStatus.failed ||
@@ -57,8 +72,28 @@ class _DownloadManagerScreenState
         actions: [
           IconButton(
             icon: const Icon(Icons.cleaning_services_rounded),
-            tooltip: 'Clear completed',
-            onPressed: () => ref.read(downloadProvider.notifier).clearCompleted(),
+            tooltip: 'Clear finished history',
+            onPressed: () => _runAction(context, () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Clear finished history?'),
+                  content: const Text(
+                      'Removes completed, failed and cancelled entries. Downloaded files remain on the server.'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Keep history')),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Clear history')),
+                  ],
+                ),
+              );
+              if (confirmed == true) {
+                await ref.read(downloadProvider.notifier).clearCompleted();
+              }
+            }),
           ),
         ],
         bottom: TabBar(
@@ -67,18 +102,49 @@ class _DownloadManagerScreenState
           unselectedLabelColor: AppColors.textHint,
           indicatorColor: AppColors.primary,
           tabs: [
-            Tab(text: 'Active${active.isNotEmpty ? ' (${active.length})' : ''}'),
-            Tab(text: 'Completed${completed.isNotEmpty ? ' (${completed.length})' : ''}'),
+            Tab(
+                text:
+                    'Active${active.isNotEmpty ? ' (${active.length})' : ''}'),
+            Tab(
+                text:
+                    'Completed${completed.isNotEmpty ? ' (${completed.length})' : ''}'),
             const Tab(text: 'History'),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabs,
+      body: Column(
         children: [
-          _DownloadList(items: active, emptyMessage: 'No active downloads'),
-          _DownloadList(items: completed, emptyMessage: 'No completed downloads'),
-          _DownloadList(items: history, emptyMessage: 'No download history'),
+          if (sync.hasError)
+            MaterialBanner(
+              content: const Text(
+                  'Cannot reach the backend. Showing the last known downloads.'),
+              actions: [
+                TextButton(
+                  onPressed: () =>
+                      ref.read(downloadProvider.notifier).loadAll(),
+                  child: const Text('Retry connection'),
+                )
+              ],
+            ),
+          if (sync.isLoading && downloads.isEmpty)
+            const LinearProgressIndicator(),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Text(
+                'Files are stored on the backend. Use Save file to download a copy to this device.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          ),
+          Expanded(
+              child: TabBarView(
+            controller: _tabs,
+            children: [
+              _DownloadList(items: active, emptyMessage: 'No active downloads'),
+              _DownloadList(
+                  items: completed, emptyMessage: 'No completed downloads'),
+              _DownloadList(
+                  items: history, emptyMessage: 'No download history'),
+            ],
+          )),
         ],
       ),
     );
@@ -147,7 +213,9 @@ class _DownloadCard extends ConsumerWidget {
   String _etaLabel() {
     if (item.eta == null) return '';
     final eta = item.eta!;
-    if (eta >= 3600) return '${(eta / 3600).floor()}h ${((eta % 3600) / 60).floor()}m';
+    if (eta >= 3600) {
+      return '${(eta / 3600).floor()}h ${((eta % 3600) / 60).floor()}m';
+    }
     if (eta >= 60) return '${(eta / 60).floor()}m ${eta % 60}s';
     return '${eta}s';
   }
@@ -240,12 +308,54 @@ class _DownloadCard extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.cancel_outlined,
                       color: AppColors.error, size: 20),
-                  onPressed: () => ref
-                      .read(downloadProvider.notifier)
-                      .cancel(item.downloadId),
+                  tooltip: 'Cancel download',
+                  onPressed: () => _runAction(
+                      context,
+                      () => ref
+                          .read(downloadProvider.notifier)
+                          .cancel(item.downloadId)),
                 ),
             ],
           ),
+
+          if (item.status == DownloadStatus.completed ||
+              item.status == DownloadStatus.failed ||
+              item.status == DownloadStatus.cancelled) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: item.status == DownloadStatus.completed
+                  ? TextButton.icon(
+                      icon: const Icon(Icons.save_alt_rounded),
+                      label: const Text('Save file'),
+                      onPressed: () => _runAction(context, () async {
+                        final uri = ref
+                            .read(downloadProvider.notifier)
+                            .fileUri(item.downloadId);
+                        if (!await launchUrl(uri,
+                            mode: LaunchMode.externalApplication)) {
+                          throw Exception('Could not open the file download');
+                        }
+                      }),
+                    )
+                  : TextButton.icon(
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry download'),
+                      onPressed: () => _runAction(context, () async {
+                        await ref
+                            .read(downloadProvider.notifier)
+                            .retry(item.downloadId);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Download queued again. Check the Active tab.')),
+                          );
+                        }
+                      }),
+                    ),
+            ),
+          ],
 
           // Progress bar for active downloads
           if (item.isActive) ...[
@@ -270,8 +380,8 @@ class _DownloadCard extends ConsumerWidget {
                 Row(
                   children: [
                     if (_speedLabel().isNotEmpty) ...[
-                      const Icon(Icons.speed, size: 11,
-                          color: AppColors.textHint),
+                      const Icon(Icons.speed,
+                          size: 11, color: AppColors.textHint),
                       const SizedBox(width: 2),
                       Text(_speedLabel(),
                           style: const TextStyle(
@@ -293,13 +403,11 @@ class _DownloadCard extends ConsumerWidget {
           ],
 
           // Error message
-          if (item.status == DownloadStatus.failed &&
-              item.error != null) ...[
+          if (item.status == DownloadStatus.failed && item.error != null) ...[
             const SizedBox(height: 8),
             Text(
               item.error!,
-              style: const TextStyle(
-                  color: AppColors.error, fontSize: 11),
+              style: const TextStyle(color: AppColors.error, fontSize: 11),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),

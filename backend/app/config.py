@@ -4,6 +4,7 @@ import os
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,7 +24,8 @@ class Settings(BaseSettings):
     # ── Server ────────────────────────────────────────────────────────────────
     host: str = "0.0.0.0"
     port: int = 8000
-    workers: int = 4
+    workers: int = 1
+    frontend_dir: str | None = None
     allowed_origins: list[str] = ["*"]
 
     # ── Database ──────────────────────────────────────────────────────────────
@@ -35,7 +37,7 @@ class Settings(BaseSettings):
 
     # ── Downloads ─────────────────────────────────────────────────────────────
     download_dir: str = "./downloads"
-    max_concurrent_downloads: int = 3
+    max_concurrent_downloads: int = Field(default=3, ge=1, le=32)
     max_file_size_mb: int = 2048
 
     # ── yt-dlp ────────────────────────────────────────────────────────────────
