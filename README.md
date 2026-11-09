@@ -135,12 +135,24 @@ yt-dlp supports **1000+** platforms out of the box, including:
 ## Download reliability
 
 - Quality preferences and custom yt-dlp format selectors are accepted by the API.
-- Completed files can be saved from the Downloads screen. Downloads run on the backend, not directly on the phone/browser.
+- Completed server files can be copied to Android **Downloads/Fetchio** using **Save to device**. **Open player** (or tapping a completed card) saves a copy if needed, then opens it in an installed player with a granted content URI. Server extraction and device saving are separate stages.
 - Failed and cancelled downloads can be retried with their original options.
 - History and original requests persist as atomic `.download.json` records in each download directory. On restart, interrupted jobs become failed entries that can be retried; jobs are not automatically resumed.
 - Cancellation cooperatively stops yt-dlp at its next progress hook. Metadata extraction and FFmpeg processing may finish before the worker exits; its concurrency slot stays occupied until then.
 - Clearing finished history leaves media files on disk. Storage cleanup remains an operator responsibility.
 - The client retains its last known list during connection errors and polls for recovery every three seconds.
+
+## Android files and playback
+
+A **Completed** entry means the backend finished extracting the media; it is not yet a file on the phone. In Downloads → Completed:
+
+- **Save to device** streams the server file into temporary app storage, publishes it to public **Internal storage → Download (Downloads) → Fetchio**, and shows transfer progress. Keep the app open during this transfer.
+- **Open player**, or tapping the completed card, saves first when necessary and launches an installed player using the file's MIME type and a read-granted URI. If no compatible player is installed, the saved file remains in Downloads/Fetchio.
+- The app remembers saved files across launches and checks whether they still exist. Reopening a saved file does not download another copy; deleting it externally lets you save it again.
+- Android 10+ uses MediaStore without requesting broad storage access. Android 7–9 requests storage permission and uses FileProvider to open the public file safely. Failed publishes remove incomplete MediaStore entries; temporary transfer files are cleaned up.
+- Clearing server download history does not delete public device files. A server file must still exist for the first save. Uninstalling the app removes its saved-file index, but public downloads remain managed by Android.
+
+This behavior requires a new Android APK; a backend-only redeployment does not update the storage/player integration. Native storage and player dispatch must be checked on an Android device after building the manual release workflow. Browser preview verifies the controls, not Android MediaStore or installed-player behavior.
 
 ## Troubleshooting media info and thumbnails
 
