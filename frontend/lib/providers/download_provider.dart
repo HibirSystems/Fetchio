@@ -9,7 +9,13 @@ import 'settings_provider.dart';
 // ── Notifier ──────────────────────────────────────────────────────────────────
 
 class DownloadNotifier extends StateNotifier<List<DownloadItem>> {
-  DownloadNotifier(this._repo) : super([]);
+  DownloadNotifier(this._repo, {void Function(AsyncValue<void>)? onSync})
+      : _onSync = onSync,
+        super([]) {
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => loadAll());
+  }
+
+  final void Function(AsyncValue<void>)? _onSync;
 
   final BackendDownloadManager _repo;
   Timer? _pollTimer;
@@ -54,29 +60,27 @@ class DownloadNotifier extends StateNotifier<List<DownloadItem>> {
     await _refreshFromBackend();
   }
 
-  Future<void> _refreshFromBackend() async {
-    if (_refreshing) return;
-    _refreshing = true;
-    try {
-      state = await _repo.listDownloads();
-    } catch (_) {
-      // Keep the last known state when the backend is temporarily unavailable.
-    } finally {
-      _refreshing = false;
-      _syncPolling();
-    }
+  Future<DownloadItem> retry(String id) async {
+    final item = await _repo.retryDownload(id);
+    await _refreshFromBackend();
+    return item;
   }
 
-  void _syncPolling() {
-    final hasActive = state.any((item) => item.isActive);
-    if (hasActive && _pollTimer == null) {
-      _pollTimer = Timer.periodic(
-        const Duration(seconds: 1),
-        (_) => _refreshFromBackend(),
-      );
-    } else if (!hasActive && _pollTimer != null) {
-      _pollTimer?.cancel();
-      _pollTimer = null;
+  Uri fileUri(String id) => _repo.downloadFileUri(id);
+
+  Future<void> _refreshFromBackend() async {
+    if (_refreshing || !mounted) return;
+    _refreshing = true;
+    _onSync?.call(const AsyncLoading());
+    try {
+      final items = await _repo.listDownloads();
+      if (!mounted) return;
+      state = items;
+      _onSync?.call(const AsyncData(null));
+    } catch (error, stack) {
+      if (mounted) _onSync?.call(AsyncError(error, stack));
+    } finally {
+      _refreshing = false;
     }
   }
 
@@ -110,12 +114,16 @@ class DownloadNotifier extends StateNotifier<List<DownloadItem>> {
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
+final downloadSyncProvider =
+    StateProvider<AsyncValue<void>>((ref) => const AsyncData(null));
+
 final downloadProvider =
     StateNotifierProvider<DownloadNotifier, List<DownloadItem>>((ref) {
   final baseUrl = ref.watch(settingsProvider.select((s) => s.apiBaseUrl));
   final repo = BackendDownloadManager(baseUrl);
   ref.onDispose(repo.dispose);
-  return DownloadNotifier(repo);
+  return DownloadNotifier(repo,
+      onSync: (value) => ref.read(downloadSyncProvider.notifier).state = value);
 });
 
 final activeDownloadCountProvider = Provider<int>((ref) {
