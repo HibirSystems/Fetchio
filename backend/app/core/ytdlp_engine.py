@@ -7,11 +7,14 @@ import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 import yt_dlp
 from tenacity import retry, stop_after_attempt, wait_exponential
+from yt_dlp.utils import DownloadError
 
 from app.config import settings
+from app.core.extraction_errors import extraction_error
 from app.models.media import MediaInfo, VideoFormat
 from app.models.search import MediaType, SearchResultItem
 
@@ -31,6 +34,7 @@ def _build_base_opts(extra: dict[str, Any] | None = None) -> dict[str, Any]:
         "socket_timeout": 30,
         "nocheckcertificate": False,
         "geo_bypass": True,
+        "js_runtimes": {"deno": {}, "node": {}},
     }
     if settings.ytdlp_proxy:
         opts["proxy"] = settings.ytdlp_proxy
@@ -53,12 +57,61 @@ def _parse_media_type(info: dict[str, Any]) -> MediaType:
     return MediaType.video
 
 
+def _select_thumbnail(info: dict[str, Any]) -> str | None:
+    candidates: list[tuple[tuple[float, float, float, int], str]] = []
+    scalar = info.get("thumbnail")
+    thumbnail_entries = info.get("thumbnails")
+    entries = [scalar]
+    if isinstance(thumbnail_entries, list):
+        entries.extend(thumbnail_entries)
+
+    for index, entry in enumerate(entries):
+        if isinstance(entry, dict):
+            url = entry.get("url")
+            width, height = entry.get("width"), entry.get("height")
+            preference = entry.get("preference")
+        else:
+            url = entry
+            width = height = preference = None
+        if not isinstance(url, str):
+            continue
+        url = url.strip()
+        try:
+            parsed = urlsplit(url)
+        except ValueError:
+            continue
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+            continue
+
+        def numeric(value: Any) -> float:
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                return 0.0
+            return number if number > 0 and number < float("inf") else 0.0
+
+        width_value, height_value = numeric(width), numeric(height)
+        candidates.append(
+            (
+                (
+                    width_value * height_value,
+                    width_value,
+                    numeric(preference),
+                    int(index == 0),
+                ),
+                url,
+            )
+        )
+
+    return max(candidates, key=lambda candidate: candidate[0])[1] if candidates else None
+
+
 def _parse_search_item(entry: dict[str, Any]) -> SearchResultItem:
     return SearchResultItem(
         id=entry.get("id", ""),
         title=entry.get("title", "Untitled"),
         url=entry.get("webpage_url") or entry.get("url", ""),
-        thumbnail=entry.get("thumbnail"),
+        thumbnail=_select_thumbnail(entry),
         duration=entry.get("duration"),
         view_count=entry.get("view_count"),
         uploader=entry.get("uploader") or entry.get("channel"),
@@ -101,10 +154,14 @@ def _parse_media_info(info: dict[str, Any]) -> MediaInfo:
     return MediaInfo(
         id=info.get("id", ""),
         title=info.get("title", "Untitled"),
-        url=info.get("url") or info.get("webpage_url", ""),
+        url=info.get("webpage_url") or info.get("url", ""),
         webpage_url=info.get("webpage_url"),
-        thumbnail=info.get("thumbnail"),
-        thumbnails=info.get("thumbnails", []),
+        thumbnail=_select_thumbnail(info),
+        thumbnails=[
+            thumbnail
+            for thumbnail in (info.get("thumbnails") or [])
+            if isinstance(thumbnail, dict)
+        ] if isinstance(info.get("thumbnails") or [], list) else [],
         description=info.get("description"),
         duration=info.get("duration"),
         uploader=info.get("uploader") or info.get("channel"),
@@ -136,7 +193,7 @@ class YtDlpEngine:
     ) -> list[SearchResultItem]:
         return await asyncio.to_thread(self._search_sync, query, limit)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8), reraise=True)
     def _search_sync(self, query: str, limit: int) -> list[SearchResultItem]:
         search_url = f"ytsearch{limit}:{query}"
         opts = _build_base_opts(
@@ -162,9 +219,13 @@ class YtDlpEngine:
     # ── Metadata ──────────────────────────────────────────────────────────────
 
     async def get_info(self, url: str) -> MediaInfo:
-        return await asyncio.to_thread(self._get_info_sync, url)
+        try:
+            return await asyncio.to_thread(self._get_info_sync, url)
+        except DownloadError as exc:
+            logger.warning("Media extraction failed", exc_info=True)
+            raise extraction_error(exc) from exc
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8), reraise=True)
     def _get_info_sync(self, url: str) -> MediaInfo:
         opts = _build_base_opts({"skip_download": True})
         with yt_dlp.YoutubeDL(opts) as ydl:
