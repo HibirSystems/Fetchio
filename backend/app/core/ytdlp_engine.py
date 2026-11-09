@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Callable
@@ -15,6 +16,10 @@ from app.models.media import MediaInfo, VideoFormat
 from app.models.search import MediaType, SearchResultItem
 
 logger = logging.getLogger(__name__)
+
+
+class DownloadCancelled(Exception):
+    """Raised from a progress hook when a download is cooperatively cancelled."""
 
 
 def _build_base_opts(extra: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -177,8 +182,9 @@ class YtDlpEngine:
         format_selector: str,
         progress_hook: Callable[[dict[str, Any]], None] | None = None,
         extra_opts: dict[str, Any] | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> str:
-        """Run download in a thread pool; returns output filename."""
+        """Run yt-dlp in a thread pool and return the final postprocessed path."""
         return await asyncio.to_thread(
             self._download_sync,
             url,
@@ -186,6 +192,7 @@ class YtDlpEngine:
             format_selector,
             progress_hook,
             extra_opts or {},
+            cancel_event,
         )
 
     def _download_sync(
@@ -195,6 +202,7 @@ class YtDlpEngine:
         format_selector: str,
         progress_hook: Callable[[dict[str, Any]], None] | None,
         extra_opts: dict[str, Any],
+        cancel_event: threading.Event | None = None,
     ) -> str:
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         outtmpl = str(Path(output_dir) / "%(title)s [%(id)s].%(ext)s")
@@ -210,23 +218,63 @@ class YtDlpEngine:
                 **extra_opts,
             }
         )
-        filename_holder: list[str] = []
+        progress_filenames: list[str] = []
+        postprocessor_filenames: list[str] = []
 
         original_hook = opts.get("progress_hooks", [])[:]
+        original_postprocessor_hooks = opts.get("postprocessor_hooks", [])[:]
 
         def _capture_hook(d: dict[str, Any]) -> None:
+            if cancel_event is not None and cancel_event.is_set():
+                raise DownloadCancelled("Download cancelled")
             if d.get("status") == "finished":
-                filename_holder.append(d.get("filename", ""))
+                filename = d.get("filename")
+                if filename:
+                    progress_filenames.append(filename)
             for hook in original_hook:
                 if hook and callable(hook):
                     hook(d)
 
+        def _capture_postprocessor(data: dict[str, Any]) -> None:
+            if data.get("status") != "finished":
+                return
+            info = data.get("info_dict") or {}
+            for key in ("filepath", "_filename"):
+                if info.get(key):
+                    postprocessor_filenames.append(info[key])
+            for requested in info.get("requested_downloads") or []:
+                if requested.get("filepath"):
+                    postprocessor_filenames.append(requested["filepath"])
+            for hook in original_postprocessor_hooks:
+                if hook and callable(hook):
+                    hook(data)
+
         opts["progress_hooks"] = [_capture_hook]
+        opts["postprocessor_hooks"] = [_capture_postprocessor]
 
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([url])
 
-        return filename_holder[0] if filename_holder else ""
+        for filename in postprocessor_filenames + list(reversed(progress_filenames)):
+            path = Path(filename)
+            if not path.is_absolute():
+                path = Path(output_dir) / path
+            if path.is_file():
+                return str(path.resolve())
+
+        media_extensions = {
+            ".3gp", ".aac", ".avi", ".flac", ".flv", ".m4a", ".m4v", ".mkv",
+            ".mov", ".mp3", ".mp4", ".mpeg", ".mpg", ".oga", ".ogg", ".opus",
+            ".ts", ".wav", ".webm", ".wma", ".wmv",
+        }
+        media_files = sorted(
+            path.resolve()
+            for path in Path(output_dir).rglob("*")
+            if path.is_file() and path.suffix.lower() in media_extensions
+        )
+        if len(media_files) == 1:
+            return str(media_files[0])
+        raise FileNotFoundError("yt-dlp completed without identifying a final media file")
 
 
 # Module-level singleton
