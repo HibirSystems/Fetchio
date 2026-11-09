@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:fetchio/core/network/backend_api_client.dart';
+import 'package:fetchio/core/storage/device_media.dart';
 import 'package:fetchio/core/network/backend_download_manager.dart';
 import 'package:fetchio/features/download_manager/download_manager_screen.dart';
 import 'package:fetchio/features/home/home_screen.dart';
@@ -37,7 +38,64 @@ http.Response downloadList(List<DownloadItem> items) => http.Response(
     }),
     200);
 
+class TestDeviceMedia extends DeviceMedia {
+  SavedMedia? saved;
+  int saves = 0;
+  int opens = 0;
+  @override
+  bool get supportsLocalFiles => true;
+  @override
+  Future<SavedMedia?> find(Uri source) async => saved;
+  @override
+  Future<SavedMedia> save(DownloadItem item, Uri source,
+      {void Function(double?)? onProgress}) async {
+    saves++;
+    onProgress?.call(1);
+    return saved ??= const SavedMedia(
+        uri: 'content://media/downloads/123',
+        name: 'Video.mp4',
+        mimeType: 'video/mp4');
+  }
+
+  @override
+  Future<void> open(SavedMedia media) async {
+    opens++;
+  }
+}
+
 void main() {
+  testWidgets('Android save and player actions distinguish local copies',
+      (tester) async {
+    final device = TestDeviceMedia();
+    final repo = BackendDownloadManager('https://example.com/api/v1',
+        client: MockClient((_) async => downloadList([completed])));
+    final container = ProviderContainer(overrides: [
+      downloadProvider.overrideWith((ref) => DownloadNotifier(repo)),
+      deviceMediaProvider.overrideWithValue(device),
+    ]);
+    await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: DownloadManagerScreen())));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Completed (1)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Save to device'), findsOneWidget);
+    await tester.tap(find.text('Save to device'));
+    await tester.pumpAndSettle();
+    expect(device.saves, 1);
+    expect(device.opens, 0);
+    expect(find.text('On device: Downloads/Fetchio'), findsOneWidget);
+    await tester.tap(find.text('Open player'));
+    await tester.pumpAndSettle();
+    expect(device.opens, 1);
+    await tester.tap(find.text('Completed video'));
+    await tester.pumpAndSettle();
+    expect(device.opens, 2);
+    await tester.pumpWidget(const SizedBox());
+    container.dispose();
+    repo.dispose();
+  });
+
   testWidgets('recent completed download renders its status', (tester) async {
     await tester.pumpWidget(const MaterialApp(
         home: Scaffold(body: DownloadTileCompact(item: completed))));
