@@ -29,6 +29,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final downloads = ref.watch(downloadProvider);
     final activeCount = ref.watch(activeDownloadCountProvider);
+    final transfers = ref.watch(deviceDownloadProvider);
 
     return Scaffold(
       backgroundColor: AppColors.darkBackground,
@@ -134,7 +135,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     final item = downloads[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: DownloadTileCompact(item: item),
+                      child: InkWell(
+                        onTap: item.status == DownloadStatus.completed
+                            ? () async {
+                                try {
+                                  await ref
+                                      .read(downloadProvider.notifier)
+                                      .saveToDevice(item.downloadId,
+                                          play: true);
+                                } catch (error) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                            content: Text(
+                                                'Could not play: $error')));
+                                  }
+                                }
+                              }
+                            : null,
+                        child: DownloadTileCompact(
+                            item: item,
+                            statusLabel:
+                                transfers[item.downloadId]?.saving == true
+                                    ? 'saving to device'
+                                    : transfers[item.downloadId]?.error != null
+                                        ? 'save failed'
+                                        : null),
+                      ),
                     );
                   },
                   childCount: downloads.take(5).length,
@@ -289,9 +316,10 @@ class _SearchHistorySection extends ConsumerWidget {
 }
 
 class DownloadTileCompact extends StatelessWidget {
-  const DownloadTileCompact({super.key, required this.item});
+  const DownloadTileCompact({super.key, required this.item, this.statusLabel});
 
   final DownloadItem item;
+  final String? statusLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -346,7 +374,7 @@ class DownloadTileCompact extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
-                _StatusBadge(status: item.status.name),
+                _StatusBadge(status: statusLabel ?? item.status.name),
               ],
             ),
           ),

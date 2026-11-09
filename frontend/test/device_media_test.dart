@@ -136,6 +136,18 @@ void main() {
     expect(count, 2);
   });
 
+  test(
+      'automatic download tracking survives service recreation and is scoped by backend URL',
+      () async {
+    final service = DeviceMedia(android: true);
+    await service.track(uri);
+    await service.track(uri);
+    final other = Uri.parse('https://other.example/api/v1/downloads/done/file');
+    await service.track(other);
+    final recreated = DeviceMedia(android: true);
+    expect(await recreated.pendingDownloads(), [uri, other]);
+  });
+
   test('filenames and MIME use local player-compatible values', () {
     expect(mediaFilename('/server/path/a.mp4', 'id'), 'a.mp4');
     expect(mediaFilename('../', 'id'), 'fetchio-id.mp4');

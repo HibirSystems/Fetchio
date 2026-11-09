@@ -4,6 +4,8 @@ import 'device_media_types.dart';
 
 class DeviceMedia {
   bool get supportsLocalFiles => false;
+  Future<void> track(Uri source) async {}
+  Future<List<Uri>> pendingDownloads() async => const [];
   Future<SavedMedia?> find(Uri source) async => null;
   Future<SavedMedia> save(DownloadItem item, Uri source,
       {void Function(double?)? onProgress}) async {

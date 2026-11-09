@@ -43,6 +43,10 @@ class TestDeviceMedia extends DeviceMedia {
   int saves = 0;
   int opens = 0;
   @override
+  Future<void> track(Uri source) async {}
+  @override
+  Future<List<Uri>> pendingDownloads() async => const [];
+  @override
   bool get supportsLocalFiles => true;
   @override
   Future<SavedMedia?> find(Uri source) async => saved;
@@ -64,13 +68,21 @@ class TestDeviceMedia extends DeviceMedia {
 }
 
 void main() {
-  testWidgets('Android save and player actions distinguish local copies',
+  testWidgets('completed card plays on tap without save or player buttons',
       (tester) async {
     final device = TestDeviceMedia();
     final repo = BackendDownloadManager('https://example.com/api/v1',
         client: MockClient((_) async => downloadList([completed])));
     final container = ProviderContainer(overrides: [
-      downloadProvider.overrideWith((ref) => DownloadNotifier(repo)),
+      downloadProvider.overrideWith((ref) => DownloadNotifier(
+            repo,
+            deviceMedia: device,
+            onDeviceState: (id, value) =>
+                ref.read(deviceDownloadProvider.notifier).state = {
+              ...ref.read(deviceDownloadProvider),
+              id: value,
+            },
+          )),
       deviceMediaProvider.overrideWithValue(device),
     ]);
     await tester.pumpWidget(UncontrolledProviderScope(
@@ -79,18 +91,51 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Completed (1)'));
     await tester.pumpAndSettle();
-    expect(find.text('Save to device'), findsOneWidget);
-    await tester.tap(find.text('Save to device'));
-    await tester.pumpAndSettle();
-    expect(device.saves, 1);
-    expect(device.opens, 0);
-    expect(find.text('On device: Downloads/Fetchio'), findsOneWidget);
-    await tester.tap(find.text('Open player'));
-    await tester.pumpAndSettle();
-    expect(device.opens, 1);
+    expect(find.text('Save to device'), findsNothing);
+    expect(find.text('Save file'), findsNothing);
+    expect(find.text('Open player'), findsNothing);
     await tester.tap(find.text('Completed video'));
     await tester.pumpAndSettle();
+    expect(device.saves, 1);
+    expect(device.opens, 1);
+    expect(find.text('Downloads/Fetchio'), findsOneWidget);
+    await tester.tap(find.text('Completed video'));
+    await tester.pumpAndSettle();
+    expect(device.saves, 1);
     expect(device.opens, 2);
+    await tester.pumpWidget(const SizedBox());
+    container.dispose();
+    repo.dispose();
+  });
+
+  testWidgets(
+      'device transfers stay active until saved and failures appear in history',
+      (tester) async {
+    final repo = BackendDownloadManager('https://example.com/api/v1',
+        client: MockClient((_) async => downloadList([completed])));
+    final container = ProviderContainer(overrides: [
+      downloadProvider.overrideWith((ref) => DownloadNotifier(repo))
+    ]);
+    container.read(deviceDownloadProvider.notifier).state = {
+      completed.downloadId:
+          const DeviceDownloadState(saving: true, progress: 0.5),
+    };
+    await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: DownloadManagerScreen())));
+    await tester.pumpAndSettle();
+    expect(find.text('Active (1)'), findsOneWidget);
+    expect(find.text('Completed (1)'), findsNothing);
+    expect(find.text('Saving to Downloads/Fetchio: 50%'), findsOneWidget);
+    container.read(deviceDownloadProvider.notifier).state = {
+      completed.downloadId:
+          const DeviceDownloadState(error: 'Device storage full'),
+    };
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+    expect(find.text('Device storage full'), findsOneWidget);
+    expect(find.text('Retry download'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     container.dispose();
     repo.dispose();
@@ -183,7 +228,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Completed (1)'));
     await tester.pumpAndSettle();
-    expect(find.text('Save file'), findsOneWidget);
+    expect(find.text('Save file'), findsNothing);
+    expect(find.text('Open player'), findsNothing);
+    expect(find.text('Completed video'), findsOneWidget);
     await tester.tap(find.text('History'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Retry download'));

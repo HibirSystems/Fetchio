@@ -135,7 +135,7 @@ yt-dlp supports **1000+** platforms out of the box, including:
 ## Download reliability
 
 - Quality preferences and custom yt-dlp format selectors are accepted by the API.
-- Completed server files can be copied to Android **Downloads/Fetchio** using **Save to device**. **Open player** (or tapping a completed card) saves a copy if needed, then opens it in an installed player with a granted content URI. Server extraction and device saving are separate stages.
+- Completed server files can be copied to Android **Downloads/Fetchio** automatically after backend extraction. Tapping a completed card opens it in an installed player with a granted content URI. Server extraction and device saving are separate stages.
 - Failed and cancelled downloads can be retried with their original options.
 - History and original requests persist as atomic `.download.json` records in each download directory. On restart, interrupted jobs become failed entries that can be retried; jobs are not automatically resumed.
 - Cancellation cooperatively stops yt-dlp at its next progress hook. Metadata extraction and FFmpeg processing may finish before the worker exits; its concurrency slot stays occupied until then.
@@ -144,15 +144,15 @@ yt-dlp supports **1000+** platforms out of the box, including:
 
 ## Android files and playback
 
-A **Completed** entry means the backend finished extracting the media; it is not yet a file on the phone. In Downloads → Completed:
+Downloads started on this Android device automatically transfer to public **Internal storage → Download (Downloads) → Fetchio** when backend extraction finishes. There is no separate Save button. The Active tab shows device-transfer progress; Completed means the device copy has finished. Tap a finished audio/video card to launch an installed player—no separate player button is needed.
 
-- **Save to device** streams the server file into temporary app storage, publishes it to public **Internal storage → Download (Downloads) → Fetchio**, and shows transfer progress. Keep the app open during this transfer.
-- **Open player**, or tapping the completed card, saves first when necessary and launches an installed player using the file's MIME type and a read-granted URI. If no compatible player is installed, the saved file remains in Downloads/Fetchio.
-- The app remembers saved files across launches and checks whether they still exist. Reopening a saved file does not download another copy; deleting it externally lets you save it again.
-- Android 10+ uses MediaStore without requesting broad storage access. Android 7–9 requests storage permission and uses FileProvider to open the public file safely. Failed publishes remove incomplete MediaStore entries; temporary transfer files are cleaned up.
-- Clearing server download history does not delete public device files. A server file must still exist for the first save. Uninstalling the app removes its saved-file index, but public downloads remain managed by Android.
+- Saving is managed by the download provider, not by whether the Downloads screen is open. Keep the app running during device transfers. If the app is terminated, tracked jobs are restored and saving resumes on the next launch; this is not an Android foreground/background download service.
+- Only jobs started/retried on this phone, or explicitly tapped legacy entries, are enrolled for automatic device saving. A shared backend's unrelated history is not silently copied onto every phone.
+- Saved URIs are remembered across launches; opening an existing file does not transfer it again. If a device save fails, the item appears in History with a retry action that retries only the device transfer, not backend extraction.
+- Tap an older server-completed entry to fetch its file and play it. A compatible installed player is required; missing players do not delete the downloaded file.
+- Android 10+ uses MediaStore without broad storage permission. Android 7–9 prompts for storage permission. Public files remain accessible in file explorers. Clearing backend history does not delete device files.
 
-This behavior requires a new Android APK; a backend-only redeployment does not update the storage/player integration. Native storage and player dispatch must be checked on an Android device after building the manual release workflow. Browser preview verifies the controls, not Android MediaStore or installed-player behavior.
+Install a newly built Android APK to apply this behavior. Browser previews can verify layout and controls, not Android MediaStore or installed-player dispatch.
 
 ## Troubleshooting media info and thumbnails
 

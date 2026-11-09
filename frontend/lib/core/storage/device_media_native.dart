@@ -32,6 +32,18 @@ class DeviceMedia {
 
   Future<Box<String>> _box() => Hive.openBox<String>('device_media_files');
 
+  Future<void> track(Uri source) async {
+    if (!_android) return;
+    final box = await Hive.openBox<String>('device_download_queue');
+    await box.put(source.toString(), source.toString());
+  }
+
+  Future<List<Uri>> pendingDownloads() async {
+    if (!_android) return const [];
+    final box = await Hive.openBox<String>('device_download_queue');
+    return box.values.map(Uri.parse).toList();
+  }
+
   Future<SavedMedia?> find(Uri source) async {
     if (!_android) return null;
     final box = await _box();

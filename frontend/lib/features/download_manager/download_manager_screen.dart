@@ -2,14 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../providers/download_provider.dart';
 import '../../shared/models/download_item.dart';
-import '../../core/storage/device_media.dart';
-
-final deviceMediaProvider = Provider<DeviceMedia>((ref) => DeviceMedia());
 
 Future<void> _runAction(
     BuildContext context, Future<void> Function() action) async {
@@ -55,13 +51,21 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen>
   Widget build(BuildContext context) {
     final downloads = ref.watch(downloadProvider);
     final sync = ref.watch(downloadSyncProvider);
-    final active = downloads.where((d) => d.isActive).toList();
-    final completed =
-        downloads.where((d) => d.status == DownloadStatus.completed).toList();
+    final transfers = ref.watch(deviceDownloadProvider);
+    final active = downloads
+        .where((d) => d.isActive || transfers[d.downloadId]?.saving == true)
+        .toList();
+    final completed = downloads
+        .where((d) =>
+            d.status == DownloadStatus.completed &&
+            transfers[d.downloadId]?.saving != true &&
+            transfers[d.downloadId]?.error == null)
+        .toList();
     final history = downloads
         .where((d) =>
             d.status == DownloadStatus.failed ||
-            d.status == DownloadStatus.cancelled)
+            d.status == DownloadStatus.cancelled ||
+            transfers[d.downloadId]?.error != null)
         .toList();
 
     return Scaffold(
@@ -76,27 +80,31 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen>
           IconButton(
             icon: const Icon(Icons.cleaning_services_rounded),
             tooltip: 'Clear finished history',
-            onPressed: () => _runAction(context, () async {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Clear finished history?'),
-                  content: const Text(
-                      'Removes completed, failed and cancelled entries. Downloaded files remain on the server.'),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Keep history')),
-                    FilledButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Clear history')),
-                  ],
-                ),
-              );
-              if (confirmed == true) {
-                await ref.read(downloadProvider.notifier).clearCompleted();
-              }
-            }),
+            onPressed: transfers.values.any((transfer) => transfer.saving)
+                ? null
+                : () => _runAction(context, () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Clear finished history?'),
+                          content: const Text(
+                              'Removes completed, failed and cancelled entries. Files already saved to Downloads/Fetchio are kept.'),
+                          actions: [
+                            TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Keep history')),
+                            FilledButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Clear history')),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await ref
+                            .read(downloadProvider.notifier)
+                            .clearCompleted();
+                      }
+                    }),
           ),
         ],
         bottom: TabBar(
@@ -134,7 +142,7 @@ class _DownloadManagerScreenState extends ConsumerState<DownloadManagerScreen>
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Text(
-                'Completed means ready on the server. Save to device copies it to Downloads/Fetchio; tap a completed item to save and play.',
+                'Downloads save automatically to Downloads/Fetchio. Tap a finished audio or video to play.',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           ),
           Expanded(
@@ -189,71 +197,9 @@ class _DownloadList extends StatelessWidget {
   }
 }
 
-class _DownloadCard extends ConsumerStatefulWidget {
+class _DownloadCard extends ConsumerWidget {
   const _DownloadCard({super.key, required this.item});
   final DownloadItem item;
-
-  @override
-  ConsumerState<_DownloadCard> createState() => _DownloadCardState();
-}
-
-class _DownloadCardState extends ConsumerState<_DownloadCard> {
-  DownloadItem get item => widget.item;
-  SavedMedia? _saved;
-  bool _saving = false;
-  double? _progress;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSaved());
-  }
-
-  Future<void> _loadSaved() async {
-    if (!mounted) return;
-    final service = ref.read(deviceMediaProvider);
-    if (!service.supportsLocalFiles) return;
-    try {
-      final saved = await service
-          .find(ref.read(downloadProvider.notifier).fileUri(item.downloadId));
-      if (mounted) setState(() => _saved = saved);
-    } catch (_) {
-      // A failed lookup must not prevent retrying a device save.
-    }
-  }
-
-  Future<void> _saveOrPlay({required bool play}) async {
-    if (_saving) return;
-    final service = ref.read(deviceMediaProvider);
-    final source = ref.read(downloadProvider.notifier).fileUri(item.downloadId);
-    if (!service.supportsLocalFiles) {
-      if (!await launchUrl(source, mode: LaunchMode.externalApplication)) {
-        throw Exception('Could not open the file download');
-      }
-      return;
-    }
-    setState(() {
-      _saving = true;
-      _progress = null;
-    });
-    try {
-      final saved = await service.save(item, source, onProgress: (value) {
-        if (mounted) setState(() => _progress = value);
-      });
-      if (!mounted) return;
-      setState(() => _saved = saved);
-      if (play) {
-        await service.open(saved);
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Saved to Downloads/Fetchio on this device.')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
 
   Color _statusColor() {
     switch (item.status) {
@@ -287,10 +233,17 @@ class _DownloadCardState extends ConsumerState<_DownloadCard> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final transfer = ref.watch(deviceDownloadProvider)[item.downloadId];
+    final saving = transfer?.saving == true;
+    final error = transfer?.error;
     return InkWell(
-        onTap: item.status == DownloadStatus.completed && !_saving
-            ? () => _runAction(context, () => _saveOrPlay(play: true))
+        onTap: item.status == DownloadStatus.completed && !saving
+            ? () => _runAction(context, () async {
+                  await ref
+                      .read(downloadProvider.notifier)
+                      .saveToDevice(item.downloadId, play: true);
+                })
             : null,
         child: Container(
           padding: const EdgeInsets.all(14),
@@ -361,7 +314,11 @@ class _DownloadCardState extends ConsumerState<_DownloadCard> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              item.status.name.toUpperCase(),
+                              saving
+                                  ? 'SAVING TO DEVICE'
+                                  : error != null
+                                      ? 'SAVE FAILED'
+                                      : item.status.name.toUpperCase(),
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -374,7 +331,7 @@ class _DownloadCardState extends ConsumerState<_DownloadCard> {
                       ],
                     ),
                   ),
-                  if (item.isActive)
+                  if (item.isActive && !saving)
                     IconButton(
                       icon: const Icon(Icons.cancel_outlined,
                           color: AppColors.error, size: 20),
@@ -388,74 +345,63 @@ class _DownloadCardState extends ConsumerState<_DownloadCard> {
                 ],
               ),
 
-              if (item.status == DownloadStatus.completed ||
-                  item.status == DownloadStatus.failed ||
-                  item.status == DownloadStatus.cancelled) ...[
+              if (saving) ...[
+                const SizedBox(height: 12),
+                LinearProgressIndicator(value: transfer?.progress),
+                const SizedBox(height: 6),
+                Text(
+                    transfer?.progress == null
+                        ? 'Saving to Downloads/Fetchio…'
+                        : 'Saving to Downloads/Fetchio: ${(transfer!.progress! * 100).round()}%',
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12)),
+              ] else if (error != null) ...[
                 const SizedBox(height: 8),
+                Text(error,
+                    style:
+                        const TextStyle(color: AppColors.error, fontSize: 12)),
                 Align(
-                  alignment: Alignment.centerRight,
-                  child: item.status == DownloadStatus.completed
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            if (_saving) ...[
-                              LinearProgressIndicator(value: _progress),
-                              Text(_progress == null
-                                  ? 'Saving to device…'
-                                  : 'Saving to device: ${(_progress! * 100).round()}%'),
-                            ] else ...[
-                              if (_saved != null)
-                                const Text('On device: Downloads/Fetchio',
-                                    style: TextStyle(
-                                        color: AppColors.success,
-                                        fontSize: 12)),
-                              Wrap(
-                                spacing: 8,
-                                children: [
-                                  TextButton.icon(
-                                    icon: const Icon(Icons.save_alt_rounded),
-                                    label: Text(_saved == null
-                                        ? (ref
-                                                .watch(deviceMediaProvider)
-                                                .supportsLocalFiles
-                                            ? 'Save to device'
-                                            : 'Save file')
-                                        : 'Saved on device'),
-                                    onPressed: () => _runAction(context,
-                                        () => _saveOrPlay(play: false)),
-                                  ),
-                                  TextButton.icon(
-                                    icon: const Icon(Icons.play_circle_outline),
-                                    label: const Text('Open player'),
-                                    onPressed: () => _runAction(
-                                        context, () => _saveOrPlay(play: true)),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        )
-                      : TextButton.icon(
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('Retry download'),
-                          onPressed: () => _runAction(context, () async {
-                            await ref
-                                .read(downloadProvider.notifier)
-                                .retry(item.downloadId);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Download queued again. Check the Active tab.')),
-                              );
-                            }
-                          }),
-                        ),
-                ),
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry download'),
+                      onPressed: () => _runAction(context, () async {
+                        await ref
+                            .read(downloadProvider.notifier)
+                            .saveToDevice(item.downloadId);
+                      }),
+                    )),
+              ] else if (item.status == DownloadStatus.completed) ...[
+                const SizedBox(height: 8),
+                Row(children: [
+                  const Icon(Icons.play_circle_outline,
+                      color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: Text(
+                          transfer?.saved != null
+                              ? 'Downloads/Fetchio'
+                              : 'Tap to play',
+                          style: const TextStyle(
+                              color: AppColors.textSecondary, fontSize: 12))),
+                ]),
+              ] else if (item.status == DownloadStatus.failed ||
+                  item.status == DownloadStatus.cancelled) ...[
+                Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry download'),
+                      onPressed: () => _runAction(context, () async {
+                        await ref
+                            .read(downloadProvider.notifier)
+                            .retry(item.downloadId);
+                      }),
+                    )),
               ],
 
               // Progress bar for active downloads
-              if (item.isActive) ...[
+              if (item.isActive && !saving) ...[
                 const SizedBox(height: 12),
                 LinearPercentIndicator(
                   percent: (item.percent / 100).clamp(0.0, 1.0),
