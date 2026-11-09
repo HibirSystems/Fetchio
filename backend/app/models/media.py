@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from app.models.normalization import normalize_duration
 from app.models.search import MediaType
 
 
@@ -50,6 +51,11 @@ class MediaInfo(BaseModel):
     chapters: list[dict[str, Any]] = []
 
     model_config = {"from_attributes": True}
+
+    @field_validator("duration", mode="before")
+    @classmethod
+    def normalize_duration_value(cls, value: Any) -> int | None:
+        return normalize_duration(value)
 
 
 class MediaInfoRequest(BaseModel):

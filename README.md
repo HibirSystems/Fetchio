@@ -144,11 +144,21 @@ yt-dlp supports **1000+** platforms out of the box, including:
 
 ## Troubleshooting media info and thumbnails
 
+The backend pins yt-dlp **2026.10.26** with matching **yt-dlp-ejs 0.8.0**. Site extractors need coordinated, tested updates; the old February pin does not track later YouTube, Vimeo, Instagram or Facebook changes. Python 3.11+ is required by this extractor release (the image uses 3.12). The release APK remains Android-only and does not bundle these backend dependencies.
+
+Fractional durations returned by sites (for example Facebook's `67.596` seconds) are normalized to integer seconds (`67`) before API serialization; unknown/nonfinite durations are omitted. Search and media details use the same rule.
+
+Downloads use yt-dlp's normal format selection. A transfer-level HTTP 403 triggers **one** fresh extraction from the original URL with the same format/options. Persistent refusals stop with a specific error rather than looping or silently lowering quality. This can recover stale links; it does not grant access to restricted content or guarantee a YouTube download.
+
+`GET /api/v1/health` exposes `extractor_version` and `ejs_version` so you can verify which backend was actually deployed. It does not expose cookies, proxy configuration or server paths. After deployment, check that it reports `2026.10.26` and `0.8.0`; a successful APK build alone does not update Railway's backend.
+
 Downloads preserve the URL originally opened or pasted in the app. Metadata stream links (such as signed `googlevideo.com/videoplayback` URLs) are not reused as the download source. After deploying this fix, rebuild/install the Android APK as well as restarting the backend. For failed history entries created by older versions with a stream URL, open the original video page and start a **new** download; retrying an old entry retains its saved request.
 
 Flat search entries can return a `thumbnails` list instead of a single image URL. The backend normalizes that list for Android clients; deploy/restart the backend to clear cached search responses after updating.
 
 YouTube extraction needs both the pinned `yt-dlp-ejs` Python dependency (included in `backend/requirements.txt`) and a supported JavaScript runtime. The Docker image includes Node.js 22.14.0 and explicitly enables it in yt-dlp. For non-Docker deployments, install Node.js >=22 on the backend's PATH. These are backend dependencies; rebuilding the APK alone does not install them.
+
+If YouTube metadata loads but the **file transfer returns HTTP 403**, that is a different failure from a missing page URL. The site may require current client/JavaScript support, Proof-of-Origin (PO) tokens, or authorized account access, and may restrict the backend's network. Follow the [official YouTube extractor guidance](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#youtube) and [PO-token guide](https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide). No token provider is installed automatically and no credentials are collected by the app. Tokens/cookies are not universal guarantees.
 
 If metadata fails with **sign-in/bot verification required**, search may still work because flat search does not fetch downloadable formats. The API now returns an actionable explanation instead of `RetryError[<Future ...>]`. Server IP restrictions, login requirements and unavailable media are not fixed by a new APK or by a JavaScript runtime alone.
 
@@ -188,7 +198,7 @@ flutter analyze
 flutter build web --release --web-renderer canvaskit --no-web-resources-cdn
 ```
 
-Implementation references: [yt-dlp embedding and output paths (2026.02.21)](https://github.com/yt-dlp/yt-dlp/tree/2026.02.21#embedding-yt-dlp), [Flutter network loading/error states](https://docs.flutter.dev/cookbook/networking/fetch-data).
+Implementation references: [yt-dlp embedding and output paths (2026.10.26)](https://github.com/yt-dlp/yt-dlp/tree/2026.10.26#embedding-yt-dlp), [Flutter network loading/error states](https://docs.flutter.dev/cookbook/networking/fetch-data).
 
 ---
 

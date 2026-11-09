@@ -24,7 +24,7 @@ def extraction_error(error: Exception) -> MediaExtractionError:
             "A cookies file may be required; retrying the same request alone will not fix this.",
             "upstream_authentication_failed",
         )
-    if any(term in message for term in ("sign in", "login required", "private video", "members-only", "age-restricted")):
+    if any(term in message for term in ("sign in", "log in", "logged-in", "login required", "private video", "members-only", "age-restricted")):
         return MediaExtractionError(
             "This media requires an account with access. The backend operator can configure "
             "YTDLP_COOKIES_FILE using authorized cookies; never paste cookies into the app.",
@@ -35,6 +35,14 @@ def extraction_error(error: Exception) -> MediaExtractionError:
             "The backend could not solve the site's JavaScript challenge. Install the pinned "
             "yt-dlp-ejs dependency and a supported Node.js runtime, then restart the backend.",
             "javascript_challenge_failed",
+        )
+    if "403" in message and any(term in message for term in ("video data", "fragment", "segment")):
+        return MediaExtractionError(
+            "The media site refused the file transfer (HTTP 403), even after refreshing the video link. "
+            "This is a backend/site access restriction, not a phone storage error. "
+            "For YouTube, the operator should check current yt-dlp JavaScript and PO-token requirements; "
+            "repeated retries or a new APK alone will not resolve an access restriction.",
+            "media_transfer_forbidden",
         )
     if "unsupported url" in message:
         return MediaExtractionError("This URL is not supported. Paste the original media page URL.", "unsupported_url")
