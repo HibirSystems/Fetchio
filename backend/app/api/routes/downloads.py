@@ -4,8 +4,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 
 from app.models.download import (
     DownloadListResponse,
@@ -39,6 +41,33 @@ async def get_download(download_id: str) -> DownloadProgress:
     if not progress:
         raise HTTPException(status_code=404, detail="Download not found")
     return progress
+
+
+@router.post("/{download_id}/retry", response_model=DownloadProgress, status_code=202)
+async def retry_download(download_id: str) -> DownloadProgress:
+    """Retry a failed or otherwise retryable download."""
+    try:
+        progress = await download_service.retry_download(download_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not progress:
+        raise HTTPException(status_code=404, detail="Download not found")
+    return progress
+
+
+@router.get("/{download_id}/file")
+async def download_file(download_id: str) -> FileResponse:
+    """Download a completed file from its own download directory."""
+    progress = await download_service.get_download(download_id)
+    if not progress:
+        raise HTTPException(status_code=404, detail="Download not found")
+    if progress.status != DownloadStatus.completed:
+        raise HTTPException(status_code=409, detail="Download is not completed")
+
+    path = download_service.resolve_download_file(progress)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Download file not found")
+    return FileResponse(path, filename=Path(path).name, media_type="application/octet-stream")
 
 
 @router.delete("/{download_id}")
