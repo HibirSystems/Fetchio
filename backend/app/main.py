@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncIterator
 
 import structlog
@@ -11,6 +12,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import ORJSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api import api_router
 from app.config import settings
@@ -81,6 +83,9 @@ def create_app() -> FastAPI:
 
     # ── Routes ─────────────────────────────────────────────────────────────────
     app.include_router(api_router, prefix="/api/v1")
+
+    if settings.frontend_dir:
+        app.mount("/", StaticFiles(directory=Path(settings.frontend_dir), html=True), name="frontend")
 
     return app
 
