@@ -126,38 +126,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     SettingsNotifier notifier,
   ) async {
     final controller = TextEditingController(text: settings.apiBaseUrl);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppColors.darkSurface,
-          title: const Text('API Base URL'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.url,
-            decoration: const InputDecoration(
-              hintText: 'http://10.0.2.2:8000/api/v1',
+    var validationError = validateApiBaseUrl(controller.text);
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              backgroundColor: AppColors.darkSurface,
+              title: const Text('API Base URL'),
+              content: TextField(
+                controller: controller,
+                keyboardType: TextInputType.url,
+                onChanged: (value) => setDialogState(
+                  () => validationError = validateApiBaseUrl(value),
+                ),
+                decoration: InputDecoration(
+                  hintText: 'http://10.0.2.2:8000/api/v1',
+                  errorText: validationError,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: validationError == null
+                      ? () => Navigator.of(dialogContext).pop(true)
+                      : null,
+                  child: const Text('Save'),
+                ),
+              ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
+          );
+        },
+      );
 
-    if (confirmed == true) {
+      if (!mounted || confirmed != true) return;
       await notifier.setApiBaseUrl(controller.text);
+    } finally {
+      controller.dispose();
     }
-
-    controller.dispose();
   }
 
   void _showQualityPicker(
