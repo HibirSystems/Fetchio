@@ -22,15 +22,16 @@ class MediaDetailScreen extends ConsumerWidget {
       body: infoAsync.when(
         loading: () => const _LoadingView(),
         error: (err, _) => _ErrorView(error: err.toString(), url: url),
-        data: (info) => _MediaDetailContent(info: info),
+        data: (info) => _MediaDetailContent(info: info, sourceUrl: url),
       ),
     );
   }
 }
 
 class _MediaDetailContent extends ConsumerWidget {
-  const _MediaDetailContent({required this.info});
+  const _MediaDetailContent({required this.info, required this.sourceUrl});
   final MediaInfo info;
+  final String sourceUrl;
 
   String _formatDuration(int? seconds) {
     if (seconds == null) return '';
@@ -190,6 +191,7 @@ class _MediaDetailContent extends ConsumerWidget {
                       isScrollControlled: true,
                       builder: (_) => DownloadOptionsModal(
                         mediaInfo: info,
+                        sourceUrl: sourceUrl,
                         onDownload: (req) async {
                           try {
                             await ref

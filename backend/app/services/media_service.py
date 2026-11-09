@@ -22,9 +22,11 @@ async def get_media_info(url: str) -> MediaInfo:
     key = _cache_key(url)
     if key in _cache:
         logger.debug("Cache hit for media info key %s", key)
-        return MediaInfo(**_cache[key])
+        return MediaInfo(**_cache[key]).model_copy(update={"url": url})
 
     info = await engine.get_info(url)
+    # Download requests must re-extract from the submitted page, not an expiring stream.
+    info = info.model_copy(update={"url": url})
 
     if len(_cache) >= _CACHE_MAX:
         oldest = next(iter(_cache))

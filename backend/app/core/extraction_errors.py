@@ -17,6 +17,13 @@ def extraction_error(error: Exception) -> MediaExtractionError:
             "YTDLP_COOKIES_FILE. Rebuilding the Android app will not resolve this server-side restriction.",
             "verification_required",
         )
+    if "[vimeo]" in message and "oauth token" in message and "401" in message:
+        return MediaExtractionError(
+            "Vimeo rejected the backend extractor's authentication request. "
+            "The backend operator should check yt-dlp compatibility and authorized Vimeo access. "
+            "A cookies file may be required; retrying the same request alone will not fix this.",
+            "upstream_authentication_failed",
+        )
     if any(term in message for term in ("sign in", "login required", "private video", "members-only", "age-restricted")):
         return MediaExtractionError(
             "This media requires an account with access. The backend operator can configure "
