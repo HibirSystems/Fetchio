@@ -1,9 +1,11 @@
+import 'package:http/http.dart' as http;
+
 import '../../shared/models/download_item.dart';
 import 'backend_api_client.dart';
 
 class BackendDownloadManager {
-  BackendDownloadManager(String baseUrl)
-      : _client = BackendApiClient(baseUrl: baseUrl);
+  BackendDownloadManager(String baseUrl, {http.Client? client})
+      : _client = BackendApiClient(baseUrl: baseUrl, client: client);
 
   final BackendApiClient _client;
 
@@ -37,6 +39,11 @@ class BackendDownloadManager {
   Future<bool> cancelDownload(String downloadId) {
     return _client.cancelDownload(downloadId);
   }
+
+  Future<DownloadItem> retryDownload(String downloadId) =>
+      _client.retryDownload(downloadId);
+
+  Uri downloadFileUri(String downloadId) => _client.downloadFileUri(downloadId);
 
   Future<int> clearCompleted() {
     return _client.clearCompleted();
